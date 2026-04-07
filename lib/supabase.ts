@@ -11,3 +11,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Supabase 클라이언트를 생성하여 내보냅니다.
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// 서버 라우트(handler)에서 사용할 Supabase 클라이언트.
+// 현재 프로젝트는 anon key 기반이므로, 클라이언트와 동일 인스턴스를 반환합니다.
+export function getSupabaseServer() {
+  return supabase;
+}

@@ -24,3 +24,19 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes dog-wiggle {
+    0%   { transform: translateY(0) rotate(0deg) scale(1); }
+    15%  { transform: translateY(-2px) rotate(-3deg) scale(1.02); }
+    35%  { transform: translateY(0) rotate(4deg) scale(1.03); }
+    55%  { transform: translateY(-1px) rotate(-4deg) scale(1.02); }
+    75%  { transform: translateY(0) rotate(3deg) scale(1.01); }
+    100% { transform: translateY(0) rotate(0deg) scale(1); }
+  }
+
+  .dog-fab:hover svg {
+    transform-origin: 50% 60%;
+    animation: dog-wiggle 700ms ease-in-out infinite;
+  }
+}
