@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Workspace scratch space (not part of app source):
+    ".tmp/**",
   ]),
 ]);
 

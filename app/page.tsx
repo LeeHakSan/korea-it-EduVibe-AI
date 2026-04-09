@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { Home, BookOpen, User, Trophy, Flame, Star, Lock } from 'lucide-react';
 
 // ─────────────────────────────────────────
@@ -357,7 +358,11 @@ export default function EduVibeDashboard() {
           <NavItem icon={<Home size={28} />} label="홈" active />
           <NavItem icon={<BookOpen size={28} />} label="오늘 수업" />
           <NavItem icon={<Trophy size={28} />} label="퀘스트" />
-          <NavItem icon={<User size={28} />} label="내 학습현황" />
+          <NavItem
+            href="/dashboard"
+            icon={<User size={28} />}
+            label="내 학습현황"
+          />
         </div>
       </nav>
 
@@ -368,9 +373,12 @@ export default function EduVibeDashboard() {
             <h2 className="text-lg font-bold opacity-90 uppercase tracking-[0.2em] mb-1">JAVA 기초반</h2>
             <h3 className="text-3xl font-black mb-3">이번 주 학습: 조건문과 반복문</h3>
             <p className="text-sm text-white/90 mb-5">오늘 목표: 핵심 개념 이해 + 예제 3개 완주</p>
-            <button className="bg-white text-[#58cc02] font-extrabold py-3 px-8 rounded-xl shadow-[0_6px_0_0_#e7e7e7] hover:brightness-95 hover:-translate-y-0.5 active:translate-y-1 active:shadow-none transition-all uppercase tracking-tighter">
+            <Link
+              href="/dashboard"
+              className="bg-white text-[#58cc02] font-extrabold py-3 px-8 rounded-xl shadow-[0_6px_0_0_#e7e7e7] hover:brightness-95 hover:-translate-y-0.5 active:translate-y-1 active:shadow-none transition-all uppercase tracking-tighter inline-block text-center"
+            >
               오늘 수업 자료 보기
-            </button>
+            </Link>
           </div>
           <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-8 shadow-sm">
             <h4 className="font-black text-lg mb-3">오늘 해야 할 학습</h4>
@@ -418,7 +426,7 @@ export default function EduVibeDashboard() {
         <MobileNavItem icon={<Home size={32} />} active />
         <MobileNavItem icon={<BookOpen size={32} />} />
         <MobileNavItem icon={<Trophy size={32} />} />
-        <MobileNavItem icon={<User size={32} />} />
+        <MobileNavItem href="/dashboard" icon={<User size={32} />} />
       </nav>
 
       {/* 플로팅 챗봇 */}
@@ -430,13 +438,35 @@ export default function EduVibeDashboard() {
 // ─────────────────────────────────────────
 // 보조 컴포넌트
 // ─────────────────────────────────────────
-interface NavItemProps { icon: React.ReactNode; label: string; active?: boolean; }
-function NavItem({ icon, label, active = false }: NavItemProps) {
+interface NavItemProps {
+  icon: React.ReactNode
+  label: string
+  active?: boolean
+  href?: string
+}
+
+function NavItem({ icon, label, active = false, href }: NavItemProps) {
+  const className = `flex items-center gap-4 p-4 rounded-2xl cursor-pointer font-black transition-all border-2 ${
+    active
+      ? 'bg-[#ddf4ff] border-[#84d8ff] text-[#1cb0f6]'
+      : 'border-transparent hover:bg-gray-100 text-gray-500'
+  }`
+
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {icon}
+        <span className="text-lg">{label}</span>
+      </Link>
+    )
+  }
+
   return (
-    <div className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer font-black transition-all border-2 ${active ? 'bg-[#ddf4ff] border-[#84d8ff] text-[#1cb0f6]' : 'border-transparent hover:bg-gray-100 text-gray-500'}`}>
-      {icon}<span className="text-lg">{label}</span>
+    <div className={className}>
+      {icon}
+      <span className="text-lg">{label}</span>
     </div>
-  );
+  )
 }
 
 interface PathNodeProps { status: 'completed' | 'current' | 'locked'; icon: React.ReactNode; label: string; offset?: string; }
@@ -456,11 +486,24 @@ function PathNode({ status, icon, label, offset = "" }: PathNodeProps) {
   );
 }
 
-interface MobileNavItemProps { icon: React.ReactNode; active?: boolean; }
-function MobileNavItem({ icon, active = false }: MobileNavItemProps) {
-  return (
-    <div className={`p-2 rounded-2xl transition-colors ${active ? 'bg-[#ddf4ff] text-[#1cb0f6]' : 'text-gray-400'}`}>
-      {icon}
-    </div>
-  );
+interface MobileNavItemProps {
+  icon: React.ReactNode
+  active?: boolean
+  href?: string
+}
+
+function MobileNavItem({ icon, active = false, href }: MobileNavItemProps) {
+  const className = `p-2 rounded-2xl transition-colors ${
+    active ? 'bg-[#ddf4ff] text-[#1cb0f6]' : 'text-gray-400'
+  }`
+
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {icon}
+      </Link>
+    )
+  }
+
+  return <div className={className}>{icon}</div>
 }
