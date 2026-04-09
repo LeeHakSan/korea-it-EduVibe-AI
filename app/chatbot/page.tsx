@@ -170,7 +170,7 @@ export default function ChatbotPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [faqOpen, setFaqOpen] = useState(false);
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [faqItems, setFaqItems] = useState<string[]>(FAQ_DEFAULT);
   const [qCounts, setQCounts] = useState<Record<string, number>>({});
@@ -184,6 +184,18 @@ export default function ChatbotPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    // next/navigation useSearchParams는 prerender에서 Suspense가 필요해서
+    // 여기서는 window.location.search로 open=1만 읽습니다.
+    try {
+      if (typeof window === 'undefined') return;
+      const openParam = new URLSearchParams(window.location.search).get('open');
+      setIsOpen(openParam === '1');
+    } catch {
+      // ignore
+    }
+  }, []);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -370,9 +382,9 @@ user: ${raw}`;
   );
 
   return (
-    <div className="flex flex-col items-end gap-3 pb-2 max-w-[480px] mx-auto p-4">
+    <div className="min-h-screen w-full bg-white relative">
       {isOpen && (
-        <div className="w-full flex flex-col h-[720px] bg-white border border-gray-200 rounded-2xl overflow-hidden relative shadow-lg">
+        <div className="fixed bottom-6 right-6 z-50 w-[360px] h-[620px] flex flex-col bg-white border border-gray-200 rounded-2xl overflow-hidden relative shadow-lg">
 
           {toast && (
             <div className="absolute top-[70px] left-1/2 -translate-x-1/2 bg-[#1E3A5F] text-white px-4 py-2 rounded-full text-[13px] whitespace-nowrap z-50 shadow-lg">
@@ -503,7 +515,7 @@ user: ${raw}`;
       {!isOpen && (
         <div
           onClick={toggleOpen}
-          className="relative self-end cursor-pointer hover:-translate-y-0.5 active:scale-95 transition-transform rounded-full bg-[#185FA5] w-[72px] h-[72px] flex items-center justify-center overflow-hidden"
+          className="fixed bottom-6 right-6 z-50 cursor-pointer hover:-translate-y-0.5 active:scale-95 transition-transform rounded-full bg-[#185FA5] w-[72px] h-[72px] flex items-center justify-center overflow-hidden"
         >
           {unread > 0 && (
             <div className="absolute top-0 right-0 w-[18px] h-[18px] rounded-full bg-red-500 border-2 border-white text-[9px] text-white font-medium flex items-center justify-center z-10">
