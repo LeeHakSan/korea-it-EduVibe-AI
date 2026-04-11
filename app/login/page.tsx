@@ -1,8 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff, AlertCircle } from "lucide-react"
+import { getSupabaseBrowser } from "@/lib/supabase-browser"
 
 interface FormErrors {
   email?: string
@@ -10,12 +12,14 @@ interface FormErrors {
 }
 
 export default function LoginPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   })
   const [errors, setErrors] = useState<FormErrors>({})
+  const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const validateForm = (): boolean => {
@@ -37,20 +41,39 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!validateForm()) return
 
-    if (!validateForm()) {
+    setIsSubmitting(true)
+    setServerError(null)
+
+    const supabase = getSupabaseBrowser()
+    const { error } = await supabase.auth.signInWithPassword({
+      email: formData.email,
+      password: formData.password,
+    })
+
+    if (error) {
+      setServerError("이메일 또는 비밀번호가 올바르지 않아요.")
+      setIsSubmitting(false)
       return
     }
 
-    setIsSubmitting(true)
-    // 실제 로그인 로직은 여기에 구현
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsSubmitting(false)
+    // 로그인 성공 → 대시보드로 이동 (역할 분기는 /dashboard 에서 처리)
+    router.push("/dashboard")
+    router.refresh()
   }
 
-  const handleGoogleLogin = () => {
-    // Google 로그인 로직
-    console.log("Google login clicked")
+  const handleGoogleLogin = async () => {
+    const supabase = getSupabaseBrowser()
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    if (error) {
+      setServerError("Google 로그인에 실패했어요. 잠시 후 다시 시도해주세요.")
+    }
   }
 
   return (
@@ -70,6 +93,9 @@ export default function LoginPage() {
           <h2 className="text-2xl font-bold text-[#3c3c3c] text-center mb-6">
             다시 만나서 반가워요!
           </h2>
+
+          {/* Server Error */}
+          {serverError && <ErrorTooltip message={serverError} />}
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4">

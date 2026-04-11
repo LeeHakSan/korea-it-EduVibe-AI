@@ -26,17 +26,8 @@ import {
   Plus,
 } from "lucide-react"
 
-import { supabase } from "@/lib/supabase"
-
-// 임시 사용자 데이터 (실제로는 인증에서 가져옴)
-const userData = {
-  name: "학습자",
-  role: "student" as "student" | "instructor", // "student" 또는 "instructor"로 변경 가능
-  streak: 7,
-  xp: 1250,
-  dailyGoal: 50,
-  dailyProgress: 35,
-}
+import { getSupabaseBrowser } from "@/lib/supabase-browser"
+import { getRoleFromUser, type UserRole } from "@/lib/auth"
 
 // 학습 경로 데이터
 type UnitStatus = "completed" | "current" | "locked"
@@ -110,6 +101,7 @@ function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString("ko-KR", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,  // ← 이 한 줄만 추가!
   })
 }
 
@@ -124,11 +116,24 @@ function formatDate(ts: number) {
 export default function DashboardPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  const [role, setRole] = useState<"student" | "instructor">(() => {
-    if (typeof window === "undefined") return "student"
-    const r = new URLSearchParams(window.location.search).get("role")
-    return r === "instructor" ? "instructor" : "student"
-  })
+  const [role, setRole] = useState<UserRole>("student")
+  const [userName, setUserName] = useState<string>("학습자")
+
+  // Supabase 세션에서 실제 역할과 이름을 불러옴
+  useEffect(() => {
+    const supabase = getSupabaseBrowser()
+    supabase.auth.getUser().then(({ data }: { data: { user: import("@supabase/supabase-js").User | null } }) => {
+      const user = data.user
+      if (!user) return
+      setRole(getRoleFromUser(user))
+      const name =
+        (user.user_metadata?.full_name as string) ??
+        (user.user_metadata?.name as string) ??
+        user.email?.split("@")[0] ??
+        "학습자"
+      setUserName(name)
+    })
+  }, [])
 
   const scrollToId = (id: string) => {
     const el = document.getElementById(id)
@@ -181,7 +186,7 @@ export default function DashboardPage() {
     {
       id: "seed-1",
       text: "조건문에서 if / else 중 어떤 걸 먼저 써야 하나요?",
-      createdAt: Date.now() - 1000 * 60 * 45,
+      createdAt: 1700000000000,  // ✅ 고정값
     },
   ])
 
@@ -301,6 +306,7 @@ export default function DashboardPage() {
     async function loadMaterials() {
       setMaterialsLoading(true)
       setMaterialsError(null)
+      const supabase = getSupabaseBrowser()
       try {
         const { data, error } = await supabase
           .from("materials")
@@ -315,7 +321,7 @@ export default function DashboardPage() {
         }
 
         const safe = (data ?? []).filter(
-          (x) => typeof x?.filename === "string" && typeof x?.content === "string",
+          (x: unknown) => typeof (x as Record<string, unknown>)?.filename === "string" && typeof (x as Record<string, unknown>)?.content === "string",
         ) as MaterialItem[]
         const now = Date.now()
         const safeWithValidity = safe.filter((m) => {
@@ -439,6 +445,7 @@ export default function DashboardPage() {
   const loadMaterialsFresh = async (overrideClassId?: string) => {
     setMaterialsLoading(true)
     setMaterialsError(null)
+    const supabase = getSupabaseBrowser()
     try {
       const { data, error } = await supabase
         .from("materials")
@@ -453,7 +460,7 @@ export default function DashboardPage() {
       }
 
       const safe = (data ?? []).filter(
-        (x) => typeof x?.filename === "string" && typeof x?.content === "string",
+        (x: unknown) => typeof (x as Record<string, unknown>)?.filename === "string" && typeof (x as Record<string, unknown>)?.content === "string",
       ) as MaterialItem[]
 
       const now = Date.now()
@@ -761,7 +768,7 @@ export default function DashboardPage() {
           {/* Welcome Section */}
           <div className="mb-8">
             <h2 className="text-2xl md:text-3xl font-bold text-[#3c3c3c]">
-              {userData.name}님, 오늘도 시작해요!
+              {userName}님, 오늘도 시작해요!
             </h2>
             <p className="text-[#777] font-semibold mt-1">
               지금은 {currentUnit.title} 단원을 학습 중이에요.
@@ -1644,7 +1651,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-[#ff9600] font-bold text-sm">스트릭</p>
               <p className="text-2xl font-black text-[#ff9600]">
-                {userData.streak}일
+                {"7"}일
               </p>
             </div>
           </div>
@@ -1662,7 +1669,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-[#ff4b9e] font-bold text-sm">총 XP</p>
               <p className="text-2xl font-black text-[#ff4b9e]">
-                {userData.xp.toLocaleString()}
+                {"1,250"}
               </p>
             </div>
           </div>
@@ -1674,13 +1681,11 @@ export default function DashboardPage() {
           <div className="relative h-4 bg-[#e5e5e5] rounded-full overflow-hidden mb-2">
             <div
               className="absolute left-0 top-0 h-full bg-[#58cc02] rounded-full transition-all duration-500"
-              style={{
-                width: `${(userData.dailyProgress / userData.dailyGoal) * 100}%`,
-              }}
+              style={{ width: "70%" }}
             />
           </div>
           <p className="text-[#777] font-semibold text-sm">
-            {userData.dailyProgress} / {userData.dailyGoal} XP
+            35 / 50 XP
           </p>
           <p className="text-[#777] font-semibold text-sm mt-2">
             미션 완료: {missionsDoneCount} / {dailyMissions.length}
