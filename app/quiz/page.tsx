@@ -54,9 +54,9 @@ export default function QuizPage() {
 
       try {
         const { data, error } = await supabase
-          .from("materials")
-          .select("id, class_id, filename, content")
-          .eq("class_id", materialsClassId);
+  .from("materials")
+  .select("id, class_id, filename, content")
+  .eq("class_id", "1");
 
         if (error) {
           setMaterialsError(error.message);
@@ -233,10 +233,10 @@ export default function QuizPage() {
             <label className="text-sm font-bold text-[#3c3c3c]">class_id</label>
 
             <input
-              value={materialsClassId}
-              onChange={(e) => setMaterialsClassId(e.target.value)}
-              className="w-full px-3 py-3 border border-gray-300 rounded-2xl text-[14px] outline-none bg-white text-gray-800 focus:border-blue-400"
-            />
+  value={materialsClassId}
+  onChange={(e) => setMaterialsClassId(e.target.value.replace(/[^0-9]/g, ""))}
+  className="w-full px-3 py-3 border border-gray-300 rounded-2xl text-[14px] outline-none bg-white text-gray-800 focus:border-blue-400"
+/>
 
             <button
               type="button"
