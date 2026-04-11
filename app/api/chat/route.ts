@@ -1,140 +1,117 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenAI } from "@google/genai";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 
-type ChatMessage = {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-};
+const apiKey = process.env.GEMINI_API_KEY;
 
-type ChatRequestBody = {
-  messages?: ChatMessage[];
-};
-
-function extractPrompt(messages: ChatMessage[]) {
-  const koreanPolicy = [
-    '중요 규칙:',
-    '- 답변은 반드시 한국어(ko-KR)로만 작성하세요.',
-    '- 영어 문장으로 답하지 마세요.',
-    '- 한국인 학습자를 위한 친절한 존댓말로 답변하세요.',
-  ].join('\n');
-
-  const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
-  const conversation = messages
-    .filter((m) => m.role !== 'system')
-    .map((m) => `${m.role === 'assistant' ? 'assistant' : 'user'}: ${m.content}`)
-    .join('\n');
-
-  if (system) {
-    return `${koreanPolicy}\n\n${system}\n\n${conversation}`;
-  }
-  return `${koreanPolicy}\n\n${conversation}`;
+if (!apiKey) {
+  throw new Error("GEMINI_API_KEY가 설정되지 않았습니다.");
 }
 
-export async function POST(req: NextRequest) {
+const ai = new GoogleGenAI({ apiKey });
+
+async function getEmbedding(text: string) {
+  const response = await ai.models.embedContent({
+    model: "gemini-embedding-001",
+    contents: text,
+  });
+
+  const values = response.embeddings?.[0]?.values;
+
+  if (!values || !Array.isArray(values)) {
+    throw new Error("임베딩 생성 실패");
+  }
+
+  return values;
+}
+
+export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as ChatRequestBody;
-    const messages = Array.isArray(body.messages) ? body.messages : [];
+    const body = await req.json();
+    const message = String(body?.message ?? "").trim();
 
-    if (messages.length === 0) {
-      return NextResponse.json({ error: 'messages가 비어 있습니다.' }, { status: 400 });
-    }
-
-    const apiKey =
-      process.env.GEMINI_API_KEY ??
-      process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'GEMINI API 키가 설정되지 않았습니다.' },
-        { status: 500 }
+    if (!message) {
+      return Response.json(
+        { ok: false, error: "메시지를 입력하세요." },
+        { status: 400 }
       );
     }
 
-    const prompt = extractPrompt(messages);
+    // 1. 새 질문 임베딩 만들기
+    const embedding = await getEmbedding(message);
 
-    type ModelItem = {
-      name?: string;
-      supportedGenerationMethods?: string[];
-    };
-
-    const preferredOrder = [
-      'gemini-2.0-flash',
-      'gemini-2.0-flash-lite',
-      'gemini-1.5-flash-latest',
-      'gemini-1.5-flash',
-      'gemini-1.5-pro-latest',
-      'gemini-1.5-pro',
-    ];
-
-    const apiVersions = ['v1', 'v1beta'];
-    let lastError = 'Gemini API 호출에 실패했습니다.';
-
-    for (const version of apiVersions) {
-      const modelsRes = await fetch(
-        `https://generativelanguage.googleapis.com/${version}/models?key=${apiKey}`,
-        { method: 'GET' }
-      );
-      const modelsJson = await modelsRes.json();
-
-      if (!modelsRes.ok) {
-        lastError = modelsJson?.error?.message ?? lastError;
-        continue;
+    // 2. 비슷한 질문 찾기
+    const { data: matches, error: matchError } = await supabaseAdmin.rpc(
+      "match_qa_cache",
+      {
+        query_embedding: embedding,
+        match_threshold: 0.9,
+        match_count: 1,
       }
+    );
 
-      const models = (modelsJson?.models ?? []) as ModelItem[];
-      const generatable = models
-        .filter((m) => (m.supportedGenerationMethods ?? []).includes('generateContent'))
-        .map((m) => (m.name ?? '').replace(/^models\//, ''))
-        .filter(Boolean);
-
-      const selectedModel =
-        preferredOrder.find((p) => generatable.includes(p)) ??
-        generatable.find((m) => m.includes('gemini') && !m.includes('vision') && !m.includes('embedding')) ??
-        generatable[0];
-
-      if (!selectedModel) {
-        lastError = 'generateContent를 지원하는 사용 가능한 모델이 없습니다.';
-        continue;
-      }
-
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/${version}/models/${selectedModel}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: prompt }],
-              },
-            ],
-          }),
-        }
-      );
-
-      const geminiJson = await geminiRes.json();
-      if (!geminiRes.ok) {
-        lastError = geminiJson?.error?.message ?? lastError;
-        continue;
-      }
-
-      const content =
-        geminiJson?.candidates?.[0]?.content?.parts
-          ?.map((part: { text?: string }) => part.text ?? '')
-          .join('')
-          .trim() || '답변을 생성하지 못했습니다.';
-
-      return NextResponse.json({ content, model: selectedModel, apiVersion: version });
+    if (matchError) {
+      console.error("RPC error:", matchError);
+      throw new Error(matchError.message);
     }
 
-    return NextResponse.json({ error: lastError }, { status: 502 });
+    // 3. 캐시 히트면 기존 답변 재사용
+    if (matches && matches.length > 0) {
+      return Response.json({
+        ok: true,
+        reply: matches[0].answer,
+        cached: true,
+      });
+    }
+
+    // 4. 없으면 Gemini 호출
+    const aiResponse = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: message,
+      config: {
+        systemInstruction:
+          "너는 한국어 학습 도우미 AI 튜터다. 짧고 쉽게 설명하고, 필요하면 간단한 예시를 1개 들어라.",
+        temperature: 0.7,
+        maxOutputTokens: 400,
+      },
+    });
+
+    const reply = aiResponse.text?.trim();
+
+    if (!reply) {
+      return Response.json(
+        { ok: false, error: "모델 응답이 비어 있습니다." },
+        { status: 502 }
+      );
+    }
+
+    // 5. 새 질문/답변/임베딩 저장
+    const { error: insertError } = await supabaseAdmin.from("qa_cache").insert({
+      question: message,
+      answer: reply,
+      embedding,
+    });
+
+    if (insertError) {
+      console.error("Insert error:", insertError);
+    }
+
+    return Response.json({
+      ok: true,
+      reply,
+      cached: false,
+    });
   } catch (error) {
-    console.error('Chat API error:', error);
-    return NextResponse.json(
-      { error: '서버 오류가 발생했습니다.' },
+    console.error("API ERROR:", error);
+
+    return Response.json(
+      {
+        ok: false,
+        error: "처리 중 오류가 발생했습니다.",
+        detail: error instanceof Error ? error.message : "알 수 없는 오류",
+      },
       { status: 500 }
     );
   }
 }
-
