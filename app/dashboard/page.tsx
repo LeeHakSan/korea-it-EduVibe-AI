@@ -27,7 +27,7 @@ import {
 } from "lucide-react"
 
 import { supabase } from "@/lib/supabase"
-
+import QuizStartCard from "@/components/quiz/QuizStartCard"
 // 임시 사용자 데이터 (실제로는 인증에서 가져옴)
 const userData = {
   name: "학습자",
@@ -759,14 +759,30 @@ export default function DashboardPage() {
               </div>
             </div>
           {/* Welcome Section */}
-          <div className="mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-[#3c3c3c]">
-              {userData.name}님, 오늘도 시작해요!
-            </h2>
-            <p className="text-[#777] font-semibold mt-1">
-              지금은 {currentUnit.title} 단원을 학습 중이에요.
-            </p>
-          </div>
+<div className="mb-8">
+  <h2 className="text-2xl md:text-3xl font-bold text-[#3c3c3c]">
+    {userData.name}님, 오늘도 시작해요!
+  </h2>
+  <p className="text-[#777] font-semibold mt-1">
+    지금은 {currentUnit.title} 단원을 학습 중이에요.
+  </p>
+
+  <div className="mt-4 flex flex-wrap gap-3">
+    <Link
+      href="/quiz"
+      className="inline-flex items-center rounded-2xl bg-[#1cb0f6] px-5 py-3 text-white font-bold border-b-4 border-[#1899d6] hover:bg-[#1cb0f6]/90 active:border-b-0 active:translate-y-1 transition-all"
+    >
+      쪽지시험 풀러가기
+    </Link>
+
+    <Link
+      href="/result"
+      className="inline-flex items-center rounded-2xl bg-white px-5 py-3 text-[#58cc02] font-bold border-2 border-[#d7f5b5] hover:bg-[#f0fff0] transition-all"
+    >
+      최근 결과 보기
+    </Link>
+  </div>
+</div>
 
           {/* Learning Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
