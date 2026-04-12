@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
+import { isAdminUser } from "@/lib/auth"
 
 export const runtime = "nodejs"
 
@@ -44,7 +45,7 @@ async function verifyAdmin(token: string) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
   const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user || user.user_metadata?.role !== "admin") return null
+  if (error || !user || !isAdminUser(user)) return null
   return user
 }
 

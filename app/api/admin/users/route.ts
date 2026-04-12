@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
+import { isAdminUser } from "@/lib/auth"
 
 export const runtime = "nodejs"
 
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   if (userErr || !user) {
     return NextResponse.json({ error: "인증에 실패했어요." }, { status: 401 })
   }
-  if (user.user_metadata?.role !== "admin") {
+  if (!isAdminUser(user)) {
     return NextResponse.json({ error: "관리자 권한이 필요해요." }, { status: 403 })
   }
 

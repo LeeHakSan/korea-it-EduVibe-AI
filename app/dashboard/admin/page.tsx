@@ -74,6 +74,9 @@ export default function AdminPage() {
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "instructor" | "student">("all")
 
+  // 역할 변경
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null)
+
   // ── 토큰 로드 ────────────────────────────────────────────────
   useEffect(() => {
     const supabase = getSupabaseBrowser()
@@ -116,6 +119,21 @@ export default function AdminPage() {
     if (tab === "overview") fetchOverview(token)
     if (tab === "instructors" || tab === "codes") fetchCodes(token)
   }, [token, tab, fetchOverview, fetchCodes])
+
+  // ── 역할 변경 ─────────────────────────────────────────────────
+  const changeRole = async (userId: string, newRole: "admin" | "instructor" | "student") => {
+    setUpdatingRole(userId)
+    try {
+      const res = await fetch("/api/admin/update-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ targetUserId: userId, newRole }),
+      })
+      if (res.ok) {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u))
+      }
+    } finally { setUpdatingRole(null) }
+  }
 
   // ── 필터 ─────────────────────────────────────────────────────
   const filteredUsers = users.filter((u) => {
@@ -260,7 +278,7 @@ export default function AdminPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-[#f7f7f7] border-b-2 border-[#e5e5e5]">
                     <tr>
-                      {["이름", "이메일", "역할", "과정명", "과정코드", "가입일"].map((h) => (
+                      {["이름", "이메일", "역할 (클릭하여 변경)", "과정명", "과정코드", "가입일"].map((h) => (
                         <th key={h} className="px-4 py-3 text-left font-bold text-[#777] whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -271,9 +289,23 @@ export default function AdminPage() {
                         <td className="px-4 py-3 font-bold text-[#3c3c3c]">{u.full_name || "—"}</td>
                         <td className="px-4 py-3 text-[#777] font-semibold">{u.email}</td>
                         <td className="px-4 py-3">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${ROLE_COLORS[u.role] ?? "bg-gray-100 text-gray-600"}`}>
-                            {ROLE_LABELS[u.role] ?? u.role}
-                          </span>
+                          {updatingRole === u.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-[#afafaf]" />
+                          ) : (
+                            <select
+                              value={u.role}
+                              onChange={(e) => changeRole(u.id, e.target.value as "admin" | "instructor" | "student")}
+                              className={`text-xs font-bold px-2.5 py-1.5 rounded-full border-2 cursor-pointer focus:outline-none transition-all ${
+                                u.role === "admin" ? "bg-orange-100 text-orange-700 border-orange-200"
+                                : u.role === "instructor" ? "bg-green-100 text-green-700 border-green-200"
+                                : "bg-blue-100 text-blue-700 border-blue-200"
+                              }`}
+                            >
+                              <option value="admin">관리자</option>
+                              <option value="instructor">강사</option>
+                              <option value="student">수강생</option>
+                            </select>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-[#777] font-semibold">{u.course_name || "—"}</td>
                         <td className="px-4 py-3">

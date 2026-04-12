@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
+import { isAdminUser } from "@/lib/auth"
 
 export const runtime = "nodejs"
 
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
   const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
-  if (authErr || !user || user.user_metadata?.role !== "admin") {
+  if (authErr || !user || !isAdminUser(user)) {
     return NextResponse.json({ error: "관리자 권한이 필요해요." }, { status: 403 })
   }
 
