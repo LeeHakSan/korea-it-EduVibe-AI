@@ -107,6 +107,13 @@ user: ${raw}`
   throw new Error(lastError)
 }
 
+// 전역 타입 확장 (layout에서 주입)
+declare global {
+  interface Window {
+    __chatbotInitialMessage?: string
+  }
+}
+
 export default function ChatbotWidget({
   isOpen,
   onRequestClose,
@@ -121,8 +128,8 @@ export default function ChatbotWidget({
   const [messages, setMessages] = useState<Message[]>([
     {
       type: "ai",
-      text: "안녕하세요! Java 기초반 AI 튜터입니다. 답변 모드를 선택하고 질문해주세요 😊",
-      time: "오전 10:00",
+      text: "안녕하세요! EduVibe AI 튜터입니다. 답변 모드를 선택하고 질문해주세요 😊",
+      time: getTime(),
     },
   ])
   const [mode, setMode] = useState<"h" | "f">("h")
@@ -139,6 +146,21 @@ export default function ChatbotWidget({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, isTyping])
+
+  // 챗봇이 열릴 때 단원 컨텍스트 초기 메시지 주입
+  useEffect(() => {
+    if (isOpen && window.__chatbotInitialMessage) {
+      const initMsg = window.__chatbotInitialMessage
+      window.__chatbotInitialMessage = undefined
+      const welcomeMsg: Message = {
+        type: "ai",
+        text: initMsg,
+        time: getTime(),
+      }
+      setMessages([welcomeMsg])
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
 
   function showToast(msg: string) {
     setToast(msg)
@@ -256,9 +278,9 @@ export default function ChatbotWidget({
           </svg>
         </div>
         <div className="flex-1">
-          <div className="text-[15px] font-medium text-white">Java 기초반 AI 튜터</div>
+          <div className="text-[15px] font-medium text-white">EduVibe AI 튜터</div>
           <div className="text-[11px] text-white/75 mt-[1px]">
-            {unitContext ? `현재 단원: ${unitContext}` : "수업 중"}
+            {unitContext ? `📖 ${unitContext}` : "수업 중"}
           </div>
         </div>
         <button
