@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { getSupabaseBrowser } from "@/lib/supabase-browser"
+import { getRoleFromUser } from "@/lib/auth"
 import {
   Lock, Check, ChevronRight, BookOpen, MessageCircle,
   Loader2, X, CheckCircle2, RotateCcw, Trophy, AlertCircle,
@@ -503,6 +505,27 @@ export default function LearnPage() {
     setUnits(computed)
     const cur = computed.find((u) => u.status === "current") ?? computed[0]
     setSelectedUnit(cur)
+
+    // 학생 과정 언어를 API에서 동기화
+    const supabase = getSupabaseBrowser()
+    supabase.auth.getUser().then(async ({ data }: { data: { user: import("@supabase/supabase-js").User | null } }) => {
+      const user = data.user
+      if (!user) return
+      const userRole = getRoleFromUser(user)
+      if (userRole === "student") {
+        const courseCode = (user.user_metadata?.course_code as string) ?? ""
+        if (courseCode) {
+          try {
+            const res = await fetch(`/api/course/data?code=${courseCode}`)
+            if (res.ok) {
+              const json = await res.json()
+              const lang = json.courseData?.language
+              if (lang) localStorage.setItem("eduvibe_course_language", lang)
+            }
+          } catch { /* ignore */ }
+        }
+      }
+    })
   }, [])
 
   const openTutor = () => {

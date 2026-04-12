@@ -328,37 +328,73 @@ export default function QuestPage() {
   const [courseLanguage, setCourseLanguage] = useState("Java")
 
   useEffect(() => {
-    const stored = localStorage.getItem("eduvibe_missions_v3")
-    if (stored) {
-      const parsed: Mission[] = JSON.parse(stored)
-      // 기존 저장 데이터에 problem이 없으면 DEFAULT로 보정
-      const merged = parsed.map((m) => {
-        const def = DEFAULT_MISSIONS.find((d) => d.id === m.id)
-        return { ...m, problem: m.problem ?? def?.problem ?? DEFAULT_MISSIONS[0].problem }
-      })
-      setMissions(merged)
-      const firstActive = merged.find((m) => m.status === "active")
-      setActiveMissionId(firstActive?.id ?? null)
-    } else {
-      const init = DEFAULT_MISSIONS.map((m, i) => ({
-        ...m,
-        status: i === 0 ? ("active" as MissionStatus) : ("locked" as MissionStatus),
-      }))
-      setMissions(init)
-      setActiveMissionId(init[0].id)
-      localStorage.setItem("eduvibe_missions_v3", JSON.stringify(init))
-    }
-  }, [])
-
-  useEffect(() => {
     const supabase = getSupabaseBrowser()
-    supabase.auth.getUser().then(({ data }: { data: { user: import("@supabase/supabase-js").User | null } }) => {
+    supabase.auth.getUser().then(async ({ data }: { data: { user: import("@supabase/supabase-js").User | null } }) => {
       const user = data.user
-      if (user) setRole(getRoleFromUser(user))
+      if (!user) return
+      const userRole = getRoleFromUser(user)
+      setRole(userRole)
+
+      // 학생: API에서 강사 미션 로드
+      if (userRole === "student") {
+        const courseCode = (user.user_metadata?.course_code as string) ?? ""
+        if (courseCode) {
+          try {
+            const res = await fetch(`/api/course/data?code=${courseCode}`)
+            if (res.ok) {
+              const json = await res.json()
+              const courseData = json.courseData
+              if (courseData?.missions && Array.isArray(courseData.missions)) {
+                const loaded = (courseData.missions as Omit<Mission, "status">[]).map((m, i) => ({
+                  ...m,
+                  status: i === 0 ? ("active" as MissionStatus) : ("locked" as MissionStatus),
+                }))
+                // 기존 학습 진행 상태 유지 (localStorage에 저장된 게 있으면)
+                const stored = localStorage.getItem(`eduvibe_missions_${courseCode}`)
+                if (stored) {
+                  const progress: Record<string, MissionStatus> = JSON.parse(stored)
+                  const merged = loaded.map((m) => ({ ...m, status: progress[m.id] ?? m.status }))
+                  setMissions(merged)
+                  setActiveMissionId(merged.find((m) => m.status === "active")?.id ?? null)
+                } else {
+                  setMissions(loaded)
+                  setActiveMissionId(loaded[0]?.id ?? null)
+                }
+                if (courseData.language) {
+                  localStorage.setItem("eduvibe_course_language", courseData.language)
+                  setCourseLanguage(courseData.language)
+                }
+                return
+              }
+            }
+          } catch { /* API 실패시 기본값 사용 */ }
+        }
+      }
+
+      // 강사/기본: localStorage에서 로드
+      const stored = localStorage.getItem("eduvibe_missions_v3")
+      if (stored) {
+        const parsed: Mission[] = JSON.parse(stored)
+        const merged = parsed.map((m) => {
+          const def = DEFAULT_MISSIONS.find((d) => d.id === m.id)
+          return { ...m, problem: m.problem ?? def?.problem ?? DEFAULT_MISSIONS[0].problem }
+        })
+        setMissions(merged)
+        setActiveMissionId(merged.find((m) => m.status === "active")?.id ?? null)
+      } else {
+        const init = DEFAULT_MISSIONS.map((m, i) => ({
+          ...m,
+          status: i === 0 ? ("active" as MissionStatus) : ("locked" as MissionStatus),
+        }))
+        setMissions(init)
+        setActiveMissionId(init[0].id)
+        localStorage.setItem("eduvibe_missions_v3", JSON.stringify(init))
+      }
+
+      // 코스 언어 설정 로드
+      const lang = localStorage.getItem("eduvibe_course_language") ?? "Java"
+      setCourseLanguage(lang)
     })
-    // 코스 언어 설정 로드
-    const lang = localStorage.getItem("eduvibe_course_language") ?? "Java"
-    setCourseLanguage(lang)
   }, [])
 
   const completeMission = (id: string) => {
@@ -406,6 +442,23 @@ export default function QuestPage() {
       setMissions(init)
       setActiveMissionId(init[0].id)
       localStorage.setItem("eduvibe_missions_v3", JSON.stringify(init))
+
+      // 강사: 생성된 미션을 서버에 저장 (수강생들이 불러올 수 있도록)
+      try {
+        const supabase = getSupabaseBrowser()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          await fetch("/api/course/update", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ missions: init, language: language ?? "Java" }),
+          })
+        }
+      } catch { /* 저장 실패해도 로컬에는 저장됨 */ }
+
       setUploadMsg(`✅ ${file.name} 기반으로 미션 ${init.length}개 생성됐어요! (언어: ${language ?? "Java"})`)
     } catch {
       setUploadMsg("❌ 파일 처리 중 오류가 발생했어요.")
