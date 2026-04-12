@@ -3,29 +3,34 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Eye, EyeOff, AlertCircle, CheckCircle2, Users, BookOpen, ShieldCheck, ChevronLeft } from "lucide-react"
 import { getSupabaseBrowser } from "@/lib/supabase-browser"
+import { generateCourseCode, getRedirectPathForRole, type UserRole } from "@/lib/auth"
 
 interface FormData {
-  authKey: string
   fullName: string
   username: string
   password: string
   emailLocal: string
   emailDomain: string
   phone: string
+  // role-specific
+  courseCode: string   // student: instructor's auth_key
+  courseName: string   // instructor: name of their course
+  adminCode: string    // admin: secret code
 }
 
 interface FormErrors {
-  authKey?: string
   fullName?: string
   username?: string
   password?: string
   email?: string
   phone?: string
+  courseCode?: string
+  courseName?: string
+  adminCode?: string
 }
 
-// 비밀번호 강도 체크
 function checkPassword(pw: string) {
   return {
     length: pw.length >= 8,
@@ -35,17 +40,48 @@ function checkPassword(pw: string) {
   }
 }
 
+const ROLE_CONFIG = {
+  student: {
+    label: "수강생",
+    icon: Users,
+    color: "#1cb0f6",
+    borderColor: "border-[#1cb0f6]",
+    bgColor: "bg-[#e8f7ff]",
+    description: "강사가 제공한 과정코드로 학습을 시작해요",
+  },
+  instructor: {
+    label: "강사",
+    icon: BookOpen,
+    color: "#58cc02",
+    borderColor: "border-[#58cc02]",
+    bgColor: "bg-[#f0fff0]",
+    description: "나만의 과정을 개설하고 학생을 관리해요",
+  },
+  admin: {
+    label: "관리자",
+    icon: ShieldCheck,
+    color: "#ff9600",
+    borderColor: "border-[#ff9600]",
+    bgColor: "bg-[#fff8e8]",
+    description: "시스템 전체를 관리하는 관리자 계정이에요",
+  },
+} as const
+
 export default function SignupPage() {
   const router = useRouter()
+  const [step, setStep] = useState<1 | 2>(1)
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState<FormData>({
-    authKey: "",
     fullName: "",
     username: "",
     password: "",
     emailLocal: "",
     emailDomain: "",
     phone: "",
+    courseCode: "",
+    courseName: "",
+    adminCode: "",
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [serverError, setServerError] = useState<string | null>(null)
@@ -57,10 +93,15 @@ export default function SignupPage() {
   const set = (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFormData((prev) => ({ ...prev, [field]: e.target.value }))
 
+  const handleRoleSelect = (role: UserRole) => {
+    setSelectedRole(role)
+    setStep(2)
+    setErrors({})
+    setServerError(null)
+  }
+
   const validateForm = (): boolean => {
     const errs: FormErrors = {}
-
-    if (!formData.authKey.trim()) errs.authKey = "학원 인증키를 입력해주세요."
 
     if (!formData.fullName.trim()) errs.fullName = "이름을 입력해주세요."
 
@@ -86,13 +127,36 @@ export default function SignupPage() {
       errs.phone = "올바른 휴대폰 번호를 입력해주세요. (예: 01012345678)"
     }
 
+    // 역할별 추가 검증
+    if (selectedRole === "student") {
+      if (!formData.courseCode.trim()) {
+        errs.courseCode = "강사에게 받은 과정코드를 입력해주세요."
+      } else if (!/^[A-Z0-9]{6}$/.test(formData.courseCode.toUpperCase())) {
+        errs.courseCode = "과정코드는 영문·숫자 6자리입니다."
+      }
+    }
+
+    if (selectedRole === "instructor") {
+      if (!formData.courseName.trim()) {
+        errs.courseName = "과정명을 입력해주세요. (예: 빅데이터과정)"
+      }
+    }
+
+    if (selectedRole === "admin") {
+      if (!formData.adminCode.trim()) {
+        errs.adminCode = "관리자 인증코드를 입력해주세요."
+      } else if (formData.adminCode !== "EDUVIBE2026") {
+        errs.adminCode = "관리자 인증코드가 올바르지 않아요."
+      }
+    }
+
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validateForm()) return
+    if (!selectedRole || !validateForm()) return
 
     setIsSubmitting(true)
     setServerError(null)
@@ -100,18 +164,27 @@ export default function SignupPage() {
     const email = `${formData.emailLocal}@${formData.emailDomain}`
     const supabase = getSupabaseBrowser()
 
+    // 역할별 메타데이터 구성
+    const metadata: Record<string, unknown> = {
+      full_name: formData.fullName,
+      username: formData.username,
+      phone: formData.phone,
+      role: selectedRole,
+    }
+
+    if (selectedRole === "student") {
+      metadata.course_code = formData.courseCode.toUpperCase()
+    } else if (selectedRole === "instructor") {
+      const authKey = generateCourseCode()
+      metadata.course_name = formData.courseName
+      metadata.auth_key = authKey  // 학생이 입력할 과정코드
+    }
+    // admin은 추가 메타데이터 없음
+
     const { error } = await supabase.auth.signUp({
       email,
       password: formData.password,
-      options: {
-        data: {
-          full_name: formData.fullName,
-          username: formData.username,
-          phone: formData.phone,
-          auth_key: formData.authKey,
-          role: "student",
-        },
-      },
+      options: { data: metadata },
     })
 
     if (error) {
@@ -124,7 +197,7 @@ export default function SignupPage() {
       return
     }
 
-    router.push("/dashboard")
+    router.push(getRedirectPathForRole(selectedRole))
     router.refresh()
   }
 
@@ -138,150 +211,250 @@ export default function SignupPage() {
               EduVibe<span className="text-[#1cb0f6]">-AI</span>
             </h1>
           </Link>
-          <p className="text-[#777] mt-2 font-semibold">계정 만들기</p>
+          <p className="text-[#777] mt-2 font-semibold">
+            {step === 1 ? "회원 유형을 선택해주세요" : "계정 만들기"}
+          </p>
         </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-3xl p-8 border-2 border-[#e5e5e5] space-y-4">
-
-          {serverError && <ErrorTooltip message={serverError} />}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-
-            {/* 학원 인증키 */}
-            <Field label="학원 인증키" error={errors.authKey}>
-              <input
-                type="text"
-                placeholder="학원에서 발급받은 인증키"
-                value={formData.authKey}
-                onChange={set("authKey")}
-                className={inputClass(!!errors.authKey)}
-              />
-            </Field>
-
-            {/* 이름 */}
-            <Field label="이름" error={errors.fullName}>
-              <input
-                type="text"
-                placeholder="실명을 입력해주세요"
-                value={formData.fullName}
-                onChange={set("fullName")}
-                className={inputClass(!!errors.fullName)}
-              />
-            </Field>
-
-            {/* 아이디 */}
-            <Field label="아이디" error={errors.username} hint="영문·숫자만 / 20자 이내">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="영문, 숫자 조합 (20자 이내)"
-                  value={formData.username}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/[^a-zA-Z0-9]/g, "").slice(0, 20)
-                    setFormData((p) => ({ ...p, username: v }))
-                  }}
-                  maxLength={20}
-                  className={inputClass(!!errors.username)}
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-[#afafaf] font-semibold">
-                  {formData.username.length}/20
-                </span>
-              </div>
-            </Field>
-
-            {/* 비밀번호 */}
-            <Field label="비밀번호" error={errors.password}>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="영어 대·소문자 + 숫자 포함, 8자 이상"
-                  value={formData.password}
-                  onChange={set("password")}
-                  className={inputClass(!!errors.password)}
-                />
+        {/* Step 1: 역할 선택 */}
+        {step === 1 && (
+          <div className="space-y-4">
+            {(Object.keys(ROLE_CONFIG) as UserRole[]).map((role) => {
+              const cfg = ROLE_CONFIG[role]
+              const Icon = cfg.icon
+              return (
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#afafaf] hover:text-[#777]"
+                  key={role}
+                  onClick={() => handleRoleSelect(role)}
+                  className={`w-full flex items-center gap-4 p-5 rounded-3xl bg-white border-2 ${cfg.borderColor} hover:${cfg.bgColor} transition-all duration-200 group text-left`}
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  <div
+                    className={`w-14 h-14 rounded-2xl ${cfg.bgColor} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}
+                  >
+                    <Icon className="w-7 h-7" style={{ color: cfg.color }} />
+                  </div>
+                  <div>
+                    <p className="font-black text-[#3c3c3c] text-lg">{cfg.label}</p>
+                    <p className="text-[#777] text-sm font-semibold mt-0.5">{cfg.description}</p>
+                  </div>
+                  <div className="ml-auto">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: cfg.color }}
+                    >
+                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </div>
                 </button>
+              )
+            })}
+
+            <p className="text-center mt-4 text-[#777] font-semibold">
+              이미 계정이 있나요?{" "}
+              <Link href="/login" className="text-[#1cb0f6] hover:underline font-bold">
+                로그인
+              </Link>
+            </p>
+          </div>
+        )}
+
+        {/* Step 2: 가입 양식 */}
+        {step === 2 && selectedRole && (
+          <>
+            {/* 역할 배지 + 뒤로가기 */}
+            <div className="flex items-center gap-3 mb-4">
+              <button
+                onClick={() => { setStep(1); setErrors({}); setServerError(null) }}
+                className="flex items-center gap-1 text-[#777] hover:text-[#3c3c3c] font-semibold text-sm transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                역할 변경
+              </button>
+              <div
+                className="ml-auto px-4 py-1.5 rounded-full text-white text-sm font-bold"
+                style={{ backgroundColor: ROLE_CONFIG[selectedRole].color }}
+              >
+                {ROLE_CONFIG[selectedRole].label} 가입
               </div>
-              {/* 비밀번호 강도 표시 */}
-              {formData.password.length > 0 && (
-                <div className="mt-2 grid grid-cols-2 gap-1">
-                  <PwRule ok={pwCheck.length} label="8자 이상" />
-                  <PwRule ok={pwCheck.upper} label="대문자 포함" />
-                  <PwRule ok={pwCheck.lower} label="소문자 포함" />
-                  <PwRule ok={pwCheck.number} label="숫자 포함" />
-                </div>
-              )}
-            </Field>
+            </div>
 
-            {/* 이메일 */}
-            <Field label="이메일" error={errors.email}>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="아이디"
-                  value={formData.emailLocal}
-                  onChange={set("emailLocal")}
-                  className={`${inputClass(!!errors.email)} flex-1`}
-                />
-                <span className="text-[#3c3c3c] font-bold text-lg">@</span>
-                <input
-                  type="text"
-                  placeholder="주소 (예: gmail.com)"
-                  value={formData.emailDomain}
-                  onChange={set("emailDomain")}
-                  className={`${inputClass(!!errors.email)} flex-1`}
-                />
-              </div>
-            </Field>
+            <div className="bg-white rounded-3xl p-8 border-2 border-[#e5e5e5] space-y-4">
+              {serverError && <ErrorTooltip message={serverError} />}
 
-            {/* 휴대폰 번호 */}
-            <Field label="휴대폰 번호" error={errors.phone}>
-              <input
-                type="tel"
-                placeholder="01012345678 (- 없이 입력)"
-                value={formData.phone}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/[^0-9-]/g, "")
-                  setFormData((p) => ({ ...p, phone: v }))
-                }}
-                className={inputClass(!!errors.phone)}
-              />
-            </Field>
+              <form onSubmit={handleSubmit} className="space-y-4">
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`w-full py-4 rounded-2xl font-bold text-lg text-white bg-[#58cc02] border-b-4 border-[#46a302] hover:bg-[#58cc02]/90 active:border-b-0 active:mt-1 transition-all duration-200 mt-2 ${isSubmitting ? "opacity-70" : ""}`}
-            >
-              {isSubmitting ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  가입 중...
-                </span>
-              ) : (
-                "계정 만들기"
-              )}
-            </button>
-          </form>
-        </div>
+                {/* 역할별 상단 필드 */}
+                {selectedRole === "student" && (
+                  <Field label="과정코드" error={errors.courseCode}>
+                    <input
+                      type="text"
+                      placeholder="강사에게 받은 6자리 코드 (예: AB1C2D)"
+                      value={formData.courseCode}
+                      onChange={(e) => setFormData(p => ({ ...p, courseCode: e.target.value.toUpperCase().slice(0, 6) }))}
+                      maxLength={6}
+                      className={inputClass(!!errors.courseCode)}
+                    />
+                  </Field>
+                )}
 
-        {/* Login Link */}
-        <p className="text-center mt-6 text-[#777] font-semibold">
-          이미 계정이 있나요?{" "}
-          <Link href="/login" className="text-[#1cb0f6] hover:underline font-bold">
-            로그인
-          </Link>
-        </p>
+                {selectedRole === "instructor" && (
+                  <Field label="과정명" error={errors.courseName}>
+                    <input
+                      type="text"
+                      placeholder="예: 빅데이터과정, 슬립테크과정"
+                      value={formData.courseName}
+                      onChange={set("courseName")}
+                      className={inputClass(!!errors.courseName)}
+                    />
+                    <p className="text-xs text-[#afafaf] font-semibold mt-1">
+                      가입 후 자동으로 고유 과정코드가 발급됩니다
+                    </p>
+                  </Field>
+                )}
+
+                {selectedRole === "admin" && (
+                  <Field label="관리자 인증코드" error={errors.adminCode}>
+                    <input
+                      type="password"
+                      placeholder="관리자 전용 인증코드"
+                      value={formData.adminCode}
+                      onChange={set("adminCode")}
+                      className={inputClass(!!errors.adminCode)}
+                    />
+                  </Field>
+                )}
+
+                {/* 이름 */}
+                <Field label="이름" error={errors.fullName}>
+                  <input
+                    type="text"
+                    placeholder="실명을 입력해주세요"
+                    value={formData.fullName}
+                    onChange={set("fullName")}
+                    className={inputClass(!!errors.fullName)}
+                  />
+                </Field>
+
+                {/* 아이디 */}
+                <Field label="아이디" error={errors.username} hint="영문·숫자만 / 20자 이내">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="영문, 숫자 조합 (20자 이내)"
+                      value={formData.username}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^a-zA-Z0-9]/g, "").slice(0, 20)
+                        setFormData((p) => ({ ...p, username: v }))
+                      }}
+                      maxLength={20}
+                      className={inputClass(!!errors.username)}
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-[#afafaf] font-semibold">
+                      {formData.username.length}/20
+                    </span>
+                  </div>
+                </Field>
+
+                {/* 비밀번호 */}
+                <Field label="비밀번호" error={errors.password}>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="영어 대·소문자 + 숫자 포함, 8자 이상"
+                      value={formData.password}
+                      onChange={set("password")}
+                      className={inputClass(!!errors.password)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#afafaf] hover:text-[#777]"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {formData.password.length > 0 && (
+                    <div className="mt-2 grid grid-cols-2 gap-1">
+                      <PwRule ok={pwCheck.length} label="8자 이상" />
+                      <PwRule ok={pwCheck.upper} label="대문자 포함" />
+                      <PwRule ok={pwCheck.lower} label="소문자 포함" />
+                      <PwRule ok={pwCheck.number} label="숫자 포함" />
+                    </div>
+                  )}
+                </Field>
+
+                {/* 이메일 */}
+                <Field label="이메일" error={errors.email}>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="아이디"
+                      value={formData.emailLocal}
+                      onChange={set("emailLocal")}
+                      className={`${inputClass(!!errors.email)} flex-1`}
+                    />
+                    <span className="text-[#3c3c3c] font-bold text-lg">@</span>
+                    <input
+                      type="text"
+                      placeholder="gmail.com"
+                      value={formData.emailDomain}
+                      onChange={set("emailDomain")}
+                      className={`${inputClass(!!errors.email)} flex-1`}
+                    />
+                  </div>
+                </Field>
+
+                {/* 휴대폰 */}
+                <Field label="휴대폰 번호" error={errors.phone}>
+                  <input
+                    type="tel"
+                    placeholder="01012345678 (- 없이 입력)"
+                    value={formData.phone}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^0-9-]/g, "")
+                      setFormData((p) => ({ ...p, phone: v }))
+                    }}
+                    className={inputClass(!!errors.phone)}
+                  />
+                </Field>
+
+                {/* Submit */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-4 rounded-2xl font-bold text-lg text-white border-b-4 hover:opacity-90 active:border-b-0 active:mt-1 transition-all duration-200 mt-2 disabled:opacity-70"
+                  style={{
+                    backgroundColor: ROLE_CONFIG[selectedRole].color,
+                    borderColor: selectedRole === "student" ? "#0e8ecf"
+                      : selectedRole === "instructor" ? "#46a302"
+                      : "#cc7000",
+                  }}
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      가입 중...
+                    </span>
+                  ) : (
+                    `${ROLE_CONFIG[selectedRole].label}으로 가입하기`
+                  )}
+                </button>
+              </form>
+            </div>
+
+            <p className="text-center mt-6 text-[#777] font-semibold">
+              이미 계정이 있나요?{" "}
+              <Link href="/login" className="text-[#1cb0f6] hover:underline font-bold">
+                로그인
+              </Link>
+            </p>
+          </>
+        )}
       </div>
     </main>
   )

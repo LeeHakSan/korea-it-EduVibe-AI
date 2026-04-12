@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, BookOpen, Trophy, User, PenLine, Bell, X, LogOut, CalendarDays, Briefcase } from "lucide-react"
+import { Home, BookOpen, Trophy, User, PenLine, Bell, X, LogOut, CalendarDays, Briefcase, ShieldCheck, Users, BarChart3 } from "lucide-react"
 import { getSupabaseBrowser } from "@/lib/supabase-browser"
 import { useRouter } from "next/navigation"
 
@@ -12,6 +12,15 @@ const NAV_ITEMS = [
   { href: "/dashboard/learn",      icon: BookOpen,     label: "배우기" },
   { href: "/dashboard/quest",      icon: Trophy,       label: "퀘스트" },
   { href: "/dashboard/whiteboard", icon: PenLine,      label: "화이트보드" },
+  { href: "/dashboard/notices",    icon: Bell,         label: "공지사항" },
+  { href: "/dashboard/career",     icon: Briefcase,    label: "취업정보" },
+  { href: "/dashboard/profile",    icon: User,         label: "프로필" },
+]
+
+const ADMIN_NAV_ITEMS = [
+  { href: "/dashboard/admin",      icon: ShieldCheck,  label: "관리자 홈" },
+  { href: "/dashboard/admin/users",icon: Users,        label: "사용자 관리" },
+  { href: "/dashboard/admin/stats",icon: BarChart3,    label: "통계" },
   { href: "/dashboard/notices",    icon: Bell,         label: "공지사항" },
   { href: "/dashboard/career",     icon: Briefcase,    label: "취업정보" },
   { href: "/dashboard/profile",    icon: User,         label: "프로필" },
@@ -58,13 +67,21 @@ export default function Sidebar({ isOpen, onClose, userName, role }: SidebarProp
         {/* 사용자 정보 */}
         <div className="px-4 py-3 border-b-2 border-[#e5e5e5]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#58cc02] to-[#1cb0f6] flex items-center justify-center text-white font-black text-sm">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-sm ${
+              role === "admin"
+                ? "bg-gradient-to-br from-[#ff9600] to-[#ff4b4b]"
+                : role === "instructor"
+                ? "bg-gradient-to-br from-[#58cc02] to-[#1cb0f6]"
+                : "bg-gradient-to-br from-[#1cb0f6] to-[#9333ea]"
+            }`}>
               {userName.slice(0, 1)}
             </div>
             <div>
               <p className="font-bold text-[#3c3c3c] text-sm">{userName}님</p>
-              <p className="text-xs text-[#afafaf] font-semibold">
-                {role === "instructor" ? "강사" : "학생"}
+              <p className="text-xs font-semibold" style={{
+                color: role === "admin" ? "#ff9600" : role === "instructor" ? "#58cc02" : "#1cb0f6"
+              }}>
+                {role === "admin" ? "관리자" : role === "instructor" ? "강사" : "수강생"}
               </p>
             </div>
           </div>
@@ -72,16 +89,20 @@ export default function Sidebar({ isOpen, onClose, userName, role }: SidebarProp
 
         {/* 네비게이션 */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
-            const active = pathname.startsWith(href)
+          {(role === "admin" ? ADMIN_NAV_ITEMS : NAV_ITEMS).map(({ href, icon: Icon, label }) => {
+            const active = pathname === href || (href !== "/dashboard/admin" && pathname.startsWith(href) && href !== "/dashboard")
+            const adminActive = role === "admin" && pathname.startsWith("/dashboard/admin") && href === "/dashboard/admin" && pathname === "/dashboard/admin"
+            const isActive = adminActive || (href !== "/dashboard/admin" && active)
             return (
               <Link
                 key={href}
                 href={href}
                 onClick={onClose}
                 className={`flex items-center gap-3 px-4 py-3 rounded-2xl font-bold transition-all ${
-                  active
-                    ? "bg-[#58cc02] text-white shadow-sm"
+                  isActive
+                    ? role === "admin"
+                      ? "bg-[#ff9600] text-white shadow-sm"
+                      : "bg-[#58cc02] text-white shadow-sm"
                     : "text-[#777] hover:bg-[#f7f7f7] hover:text-[#3c3c3c]"
                 }`}
               >

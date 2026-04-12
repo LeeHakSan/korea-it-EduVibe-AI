@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff, AlertCircle } from "lucide-react"
 import { getSupabaseBrowser } from "@/lib/supabase-browser"
+import { getRoleFromUser, getRedirectPathForRole } from "@/lib/auth"
 
 interface FormErrors {
   email?: string
@@ -47,7 +48,7 @@ export default function LoginPage() {
     setServerError(null)
 
     const supabase = getSupabaseBrowser()
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: formData.email,
       password: formData.password,
     })
@@ -58,8 +59,9 @@ export default function LoginPage() {
       return
     }
 
-    // 로그인 성공 → 대시보드로 이동 (역할 분기는 /dashboard 에서 처리)
-    router.push("/dashboard")
+    // 역할에 따라 다른 대시보드로 이동
+    const role = getRoleFromUser(data.user)
+    router.push(getRedirectPathForRole(role))
     router.refresh()
   }
 
