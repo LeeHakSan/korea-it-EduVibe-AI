@@ -54,6 +54,7 @@ export function generateCourseCode(): string {
 /** 역할별 로그인 후 이동 경로 */
 export function getRedirectPathForRole(role: UserRole): string {
   if (role === "admin") return "/dashboard/admin"
+  if (role === "teacher") return "/dashboard/teacher"
   return "/dashboard/home"
 }
 

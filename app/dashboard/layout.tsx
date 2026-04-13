@@ -61,15 +61,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <button onClick={() => setIsMenuOpen(true)} className="p-2 text-[#3c3c3c]">
             <Menu className="w-6 h-6" />
           </button>
-          <Link href={role === "admin" ? "/dashboard/admin" : "/dashboard/home"}>
+          <Link href={role === "admin" ? "/dashboard/admin" : role === "teacher" ? "/dashboard/teacher" : "/dashboard/home"}>
             <h1 className="text-xl font-black text-[#58cc02]">
               EduVibe<span className="text-[#1cb0f6]">-AI</span>
             </h1>
           </Link>
           {/* 뒤로가기 버튼: 홈이 아닐 때 표시 */}
-          {pathname !== "/dashboard/admin" && pathname !== "/dashboard/home" ? (
+          {pathname !== "/dashboard/admin" && pathname !== "/dashboard/teacher" && pathname !== "/dashboard/home" ? (
             <button
-              onClick={() => router.push(role === "admin" ? "/dashboard/admin" : "/dashboard/home")}
+              onClick={() => router.push(role === "admin" ? "/dashboard/admin" : role === "teacher" ? "/dashboard/teacher" : "/dashboard/home")}
               className="flex items-center gap-1 px-2 py-1.5 text-[#777] hover:text-[#3c3c3c] font-bold text-xs rounded-xl hover:bg-[#f7f7f7] transition-all"
             >
               <ArrowLeft className="w-4 h-4" />

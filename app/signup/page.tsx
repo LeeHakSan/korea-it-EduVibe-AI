@@ -80,7 +80,7 @@ export default function SignupPage() {
     const raw = formData.inviteCode.trim().toUpperCase()
     setFormData(p => ({ ...p, inviteCode: raw }))
 
-    if (raw.length !== 8) {
+    if (raw.length !== 6 && raw.length !== 8) {
       setCodeInfo(null)
       return
     }
@@ -92,8 +92,14 @@ export default function SignupPage() {
         const res = await fetch(`/api/code/validate?code=${encodeURIComponent(raw)}`)
         const json: CodeInfo = await res.json()
         setCodeInfo(json)
-        if (!json.valid) setErrors(p => ({ ...p, inviteCode: json.error ?? "유효하지 않은 코드예요." }))
-        else setErrors(p => ({ ...p, inviteCode: undefined }))
+        if (!json.valid) {
+          const defaultMsg = raw.length === 8
+            ? "유효하지 않은 8자리 초대코드예요."
+            : "유효하지 않은 6자리 과정코드예요."
+          setErrors(p => ({ ...p, inviteCode: json.error ?? defaultMsg }))
+        } else {
+          setErrors(p => ({ ...p, inviteCode: undefined }))
+        }
       } catch {
         setCodeInfo({ valid: false, error: "코드 확인 중 오류가 발생했어요." })
       } finally { setValidating(false) }
@@ -106,7 +112,7 @@ export default function SignupPage() {
   const validateForm = (): boolean => {
     const errs: FormErrors = {}
 
-    if (!codeInfo?.valid) errs.inviteCode = "유효한 초대코드를 입력해주세요."
+    if (!codeInfo?.valid) errs.inviteCode = "유효한 코드(강사 8자리 / 학생 6자리)를 입력해주세요."
 
     if (!formData.fullName.trim()) errs.fullName = "이름을 입력해주세요."
 
@@ -145,53 +151,43 @@ export default function SignupPage() {
     setServerError(null)
 
     const email = `${formData.emailLocal}@${formData.emailDomain}`
-    const supabase = getSupabaseBrowser()
-
-    // 역할별 메타데이터 구성
     const role: UserRole = codeInfo.type === "teacher" ? "teacher" : "student"
-    const metadata: Record<string, unknown> = {
-      full_name: formData.fullName,
-      username: formData.username,
-      phone: formData.phone,
-      role,
-      course_name: codeInfo.courseName ?? "",
-    }
 
-    if (role === "teacher") {
-      // 강사: 미리 생성된 auth_key 사용 (학생들이 과정코드로 입력)
-      metadata.auth_key = codeInfo.preAuthKey ?? ""
-    } else {
-      // 학생: 강사의 auth_key를 과정코드로 저장
-      metadata.course_code = codeInfo.courseCode ?? ""
-    }
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password: formData.password,
-      options: { data: metadata },
+    // ── 서버사이드 API로 계정 생성 (Admin SDK → 이메일 인증 없이 바로 활성화) ──
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password: formData.password,
+        fullName: formData.fullName,
+        username: formData.username,
+        phone: formData.phone,
+        inviteCode: formData.inviteCode,
+        role,
+        courseName: codeInfo.courseName ?? "",
+        authKey: codeInfo.preAuthKey,    // 강사용
+        courseCode: codeInfo.courseCode,  // 학생용
+        adminId: codeInfo.adminId,
+      }),
     })
 
-    if (error) {
-      setServerError(
-        error.message.includes("already registered")
-          ? "이미 가입된 이메일이에요. 로그인해 주세요."
-          : "가입 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
-      )
+    const json = await res.json() as { ok?: boolean; error?: string }
+
+    if (!res.ok || json.error) {
+      setServerError(json.error ?? "가입 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.")
       setIsSubmitting(false)
       return
     }
 
-    // 코드 사용 처리
-    if (codeInfo.adminId) {
-      await fetch("/api/code/mark-used", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: formData.inviteCode,
-          adminId: codeInfo.adminId,
-          userEmail: email,
-        }),
-      }).catch(() => {})
+    // ── 생성된 계정으로 자동 로그인 ──────────────────────────────
+    const supabase = getSupabaseBrowser()
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password: formData.password })
+
+    if (signInErr) {
+      // 가입은 됐지만 자동 로그인 실패 → 로그인 페이지로 안내
+      router.push("/login?signup=done")
+      return
     }
 
     router.push(getRedirectPathForRole(role))
@@ -243,11 +239,11 @@ export default function SignupPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* ── 초대코드 입력 ── */}
-            <Field label="초대코드 (8자리)" error={errors.inviteCode}>
+            <Field label="코드 (강사 8자리 / 학생 6자리)" error={errors.inviteCode}>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="관리자에게 받은 8자리 코드 입력"
+                  placeholder="강사 8자리 초대코드 또는 학생 6자리 과정코드"
                   value={formData.inviteCode}
                   onChange={(e) => {
                     const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8)
@@ -402,7 +398,7 @@ export default function SignupPage() {
             {/* 코드 미입력 안내 */}
             {!codeInfo?.valid && (
               <div className="text-center py-6 text-[#afafaf]">
-                <p className="font-semibold text-sm">관리자로부터 받은 8자리 코드를 입력하면</p>
+                <p className="font-semibold text-sm">강사 8자리 초대코드 또는 학생 6자리 과정코드를 입력하면</p>
                 <p className="font-semibold text-sm">가입 양식이 나타납니다</p>
               </div>
             )}

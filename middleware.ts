@@ -29,6 +29,7 @@ function resolveRole(user: { user_metadata?: Record<string, unknown> } | null): 
 /** 역할별 기본 랜딩 경로 */
 function homePath(role: "admin" | "teacher" | "student"): string {
   if (role === "admin") return "/dashboard/admin"
+  if (role === "teacher") return "/dashboard/teacher"
   return "/dashboard/home"
 }
 
@@ -56,17 +57,26 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // ※ getUser() 이전에 절대 다른 응답을 반환하지 말 것 (세션 갱신을 위해)
-  const { data: { user } } = await supabase.auth.getUser()
-
   const { pathname } = request.nextUrl
-  const role = resolveRole(user)
 
   const redirect = (path: string) => {
     const url = request.nextUrl.clone()
     url.pathname = path
     return NextResponse.redirect(url)
   }
+
+  // ── 0. 공개 페이지 (/) → 인증 체크 없이 통과 ─────────────────
+  // 단, 로그인된 사용자는 대시보드로 리다이렉트
+  if (pathname === "/" || pathname === "") {
+    // 세션 확인 (실패해도 랜딩 페이지 정상 표시)
+    const { data: { user: landingUser } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }))
+    if (landingUser) return redirect(homePath(resolveRole(landingUser)))
+    return supabaseResponse
+  }
+
+  // ※ getUser() 이전에 절대 다른 응답을 반환하지 말 것 (세션 갱신을 위해)
+  const { data: { user } } = await supabase.auth.getUser()
+  const role = resolveRole(user)
 
   // ── 1. 비인증 사용자 → /login ────────────────────────────────
   const isProtected = pathname.startsWith("/dashboard") || pathname.startsWith("/api/questions") || pathname.startsWith("/api/quiz-results")
@@ -77,9 +87,18 @@ export async function middleware(request: NextRequest) {
     return redirect(homePath(role))
   }
 
-  // ── 3. /dashboard/admin/* → 관리자만 허용 ────────────────────
+  // ── 3. 역할별 라우트 보호 ─────────────────────────────────────
+  // /dashboard/admin/* → 관리자만 허용
   if (pathname.startsWith("/dashboard/admin") && role !== "admin") {
-    return redirect("/dashboard/home")
+    return redirect(homePath(role))
+  }
+  // /dashboard/teacher/* → 강사만 허용
+  if (pathname.startsWith("/dashboard/teacher") && role !== "teacher") {
+    return redirect(homePath(role))
+  }
+  // /dashboard/home/* → 수강생만 허용 (강사·관리자는 자신의 홈으로)
+  if (pathname.startsWith("/dashboard/home") && role !== "student") {
+    return redirect(homePath(role))
   }
 
   // ── 4. 이미 로그인된 사용자가 /login·/signup 접근 ────────────

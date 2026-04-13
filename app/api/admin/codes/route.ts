@@ -1,6 +1,6 @@
 /**
  * GET  /api/admin/codes  - 초대코드 + 등록된 강사 목록 조회
- * POST /api/admin/codes  - 강사 등록(코드 생성) / 학생 코드 발급
+ * POST /api/admin/codes  - 강사 등록(코드 생성)
  */
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
@@ -12,7 +12,7 @@ export const runtime = "nodejs"
 // ── 타입 ──────────────────────────────────────────────────────
 export interface InviteCode {
   code: string              // 8자리 초대코드
-  type: "teacher" | "student"
+  type: "teacher" | "student" | "instructor" // legacy instructor 값 호환
   courseName: string
   instructorName: string
   preAuthKey: string        // 강사 코드: 미리 생성된 auth_key
@@ -71,11 +71,10 @@ export async function POST(req: NextRequest) {
   if (!requester) return NextResponse.json({ error: "관리자 권한이 필요해요." }, { status: 403 })
 
   const body = await req.json()
-  const { action, instructorName, courseName, courseCode } = body as {
-    action: "register_instructor" | "issue_student_code"
+  const { action, instructorName, courseName } = body as {
+    action: "register_instructor"
     instructorName?: string
     courseName?: string
-    courseCode?: string  // 학생코드 발급 시: 강사의 authKey
   }
 
   const adminClient = getSupabaseAdmin()
@@ -126,38 +125,6 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ signupCode, authKey, courseName, instructorName })
-  }
-
-  // ── 학생 코드 발급 ─────────────────────────────────────────
-  if (action === "issue_student_code") {
-    if (!courseCode) {
-      return NextResponse.json({ error: "과정코드(강사 authKey)가 필요해요." }, { status: 400 })
-    }
-
-    const instructor = existingInstructors.find((i) => i.authKey === courseCode)
-    const signupCode = genCode(8)
-
-    const newCode: InviteCode = {
-      code: signupCode,
-      type: "student",
-      courseName: instructor?.courseName ?? courseName ?? "",
-      instructorName: instructor?.name ?? "",
-      preAuthKey: "",
-      courseCode,
-      used: false,
-      usedBy: "",
-      createdAt: new Date().toISOString(),
-    }
-
-    const { error } = await adminClient.auth.admin.updateUserById(adminUser.id, {
-      user_metadata: {
-        ...adminUser.user_metadata,
-        invite_codes: [...existingCodes, newCode],
-      },
-    })
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ signupCode, courseName: newCode.courseName })
   }
 
   return NextResponse.json({ error: "알 수 없는 액션이에요." }, { status: 400 })

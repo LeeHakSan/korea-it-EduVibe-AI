@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Users, BookOpen, ShieldCheck, BarChart3, RefreshCw,
-  AlertCircle, Copy, Check, Plus, UserPlus, Key,
+  AlertCircle, Copy, Check, Plus, UserPlus,
   ClipboardList, Eye, EyeOff, Loader2, TrendingUp,
   Trophy, CalendarCheck, Star, Trash2, Lock, UserCog,
 } from "lucide-react"
@@ -26,7 +26,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "관리자", instructor: "강사", student: "수강생",
 }
 
-type Tab = "overview" | "instructors" | "codes" | "stats" | "users"
+type Tab = "overview" | "instructors" | "stats" | "users"
 
 // ── 클립보드 복사 훅 ──────────────────────────────────────────
 function useCopy() {
@@ -142,7 +142,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!token) return
     if (tab === "overview" || tab === "users") fetchOverview(token)
-    if (tab === "instructors" || tab === "codes") fetchCodes(token)
+    if (tab === "instructors") fetchCodes(token)
     if (tab === "stats") fetchStats(token)
   }, [token, tab, fetchOverview, fetchCodes, fetchStats])
 
@@ -208,7 +208,6 @@ export default function AdminPage() {
   const TABS: { id: Tab; icon: React.ElementType; label: string }[] = [
     { id: "overview",    icon: BarChart3,    label: "현황" },
     { id: "instructors", icon: BookOpen,     label: "강사 등록" },
-    { id: "codes",       icon: Key,          label: "코드 발급" },
     { id: "stats",       icon: TrendingUp,   label: "통계" },
     { id: "users",       icon: UserCog,      label: "사용자 관리" },
   ]
@@ -400,17 +399,6 @@ export default function AdminPage() {
         />
       )}
 
-      {/* ── 탭 3: 코드 발급 ─────────────────────────────────── */}
-      {tab === "codes" && (
-        <CodeIssueTab
-          token={token}
-          instructors={instructors}
-          codes={codes}
-          loading={loadingCodes}
-          onRefresh={() => fetchCodes(token)}
-        />
-      )}
-
       {/* ── 탭 4: 통계 ───────────────────────────────────────── */}
       {tab === "stats" && (
         <StatsTab
@@ -570,7 +558,7 @@ function InstructorTab({
           <Plus className="w-5 h-5 text-[#58cc02]" /> 강사 등록
         </h2>
         <p className="text-sm text-[#777] font-semibold">
-          강사를 등록하면 8자리 회원가입 코드와 학생용 과정코드가 자동 발급됩니다.
+          강사를 등록하면 8자리 강사용 코드와 학생 가입용 6자리 과정코드가 자동 발급됩니다.
         </p>
 
         {error && (
@@ -601,7 +589,7 @@ function InstructorTab({
                     {copied === result.authKey ? <Check className="w-4 h-4 text-[#1cb0f6]" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-[#afafaf] mt-1">코드 발급 탭에서 학생 코드 발급 시 사용</p>
+                <p className="text-xs text-[#afafaf] mt-1">학생이 회원가입 페이지에서 직접 입력하는 코드입니다</p>
               </div>
             </div>
           </div>
@@ -647,7 +635,7 @@ function InstructorTab({
               <p className="font-bold text-[#3c3c3c]">{deleteTarget.name}</p>
               <p className="text-sm text-[#777] font-semibold">{deleteTarget.courseName}</p>
               <p className="text-xs text-[#ff4b4b] font-semibold mt-2">
-                ⚠ 해당 강사의 회원가입 코드 및 연결된 학생 코드가 모두 삭제됩니다.
+                ⚠ 해당 강사의 강사 가입 코드(8자리)와 학생 과정코드(6자리) 연결이 삭제됩니다.
               </p>
             </div>
             <div className="flex gap-3">
@@ -741,241 +729,11 @@ function InstructorTab({
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 탭 3: 코드 발급
-// ═══════════════════════════════════════════════════════════════
-function CodeIssueTab({
-  token, instructors, codes, loading, onRefresh
-}: {
-  token: string
-  instructors: RegisteredInstructor[]
-  codes: InviteCode[]
-  loading: boolean
-  onRefresh: () => void
-}) {
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [issuing, setIssuing] = useState(false)
-  const [newCodes, setNewCodes] = useState<{ courseName: string; code: string }[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const { copied, copy } = useCopy()
-
-  // 코드 삭제
-  const [deletingCode, setDeletingCode] = useState<string | null>(null)
-
-  const handleDeleteCode = async (code: string) => {
-    setDeletingCode(code)
-    try {
-      const res = await fetch("/api/admin/codes", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: "delete_code", code }),
-      })
-      if (!res.ok) { const j = await res.json(); throw new Error(j.error) }
-      onRefresh()
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "삭제 중 오류가 발생했어요.")
-    } finally { setDeletingCode(null) }
-  }
-
-  const toggleSelect = (authKey: string) => {
-    setSelected(prev => {
-      const next = new Set(prev)
-      if (next.has(authKey)) { next.delete(authKey) } else { next.add(authKey) }
-      return next
-    })
-  }
-
-  const handleIssue = async () => {
-    if (selected.size === 0) { setError("과정을 하나 이상 선택해주세요."); return }
-    setIssuing(true); setError(null); setNewCodes([])
-    try {
-      const results: { courseName: string; code: string }[] = []
-      for (const courseCode of Array.from(selected)) {
-        const res = await fetch("/api/admin/codes", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ action: "issue_student_code", courseCode }),
-        })
-        const json = await res.json()
-        if (!res.ok) throw new Error(json.error)
-        results.push({ courseName: json.courseName, code: json.signupCode })
-      }
-      setNewCodes(results)
-      setSelected(new Set())
-      onRefresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "코드 발급 중 오류가 발생했어요.")
-    } finally { setIssuing(false) }
-  }
-
-  const studentCodes = codes.filter(c => c.type === "student")
-
-  return (
-    <div className="space-y-6">
-      {/* 코드 발급 폼 */}
-      <div className="bg-white rounded-3xl border-2 border-[#e5e5e5] p-6 space-y-4">
-        <h2 className="text-lg font-black text-[#3c3c3c] flex items-center gap-2">
-          <Key className="w-5 h-5 text-[#ff9600]" /> 학생 코드 발급
-        </h2>
-        <p className="text-sm text-[#777] font-semibold">
-          학생 코드를 발급할 과정을 선택하세요. 선택한 과정별로 8자리 회원가입 코드가 각각 발급됩니다.
-        </p>
-
-        {error && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-2xl text-red-600 text-sm font-semibold">
-            <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-          </div>
-        )}
-
-        {/* 새로 발급된 코드 결과 */}
-        {newCodes.length > 0 && (
-          <div className="p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl space-y-3">
-            <p className="font-black text-orange-700">✅ 학생 코드 발급 완료!</p>
-            <div className="space-y-2">
-              {newCodes.map(({ courseName, code }) => (
-                <div key={code} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-orange-200">
-                  <div>
-                    <p className="font-bold text-[#3c3c3c] text-sm">{courseName}</p>
-                    <code className="text-xl font-black text-[#ff9600] tracking-widest">{code}</code>
-                  </div>
-                  <button onClick={() => copy(code)} className="text-[#afafaf] hover:text-[#ff9600]">
-                    {copied === code ? <Check className="w-5 h-5 text-[#ff9600]" /> : <Copy className="w-5 h-5" />}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 과정 체크박스 목록 */}
-        {loading ? (
-          <div className="flex items-center gap-2 text-[#afafaf] py-4">
-            <Loader2 className="w-4 h-4 animate-spin" /> 불러오는 중...
-          </div>
-        ) : instructors.length === 0 ? (
-          <div className="flex flex-col items-center py-8 text-[#afafaf] gap-2">
-            <BookOpen className="w-8 h-8" />
-            <p className="font-semibold text-sm">먼저 강사를 등록해주세요</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-[#3c3c3c]">코드 발급할 과정 선택</p>
-              <button
-                onClick={() => setSelected(new Set(instructors.map(i => i.authKey)))}
-                className="text-xs text-[#1cb0f6] font-bold hover:underline"
-              >
-                전체 선택
-              </button>
-            </div>
-            {instructors.map((ins) => (
-              <label
-                key={ins.authKey}
-                className={`flex items-center gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                  selected.has(ins.authKey)
-                    ? "border-[#ff9600] bg-orange-50"
-                    : "border-[#e5e5e5] hover:border-[#ff9600]/50"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.has(ins.authKey)}
-                  onChange={() => toggleSelect(ins.authKey)}
-                  className="w-5 h-5 accent-[#ff9600]"
-                />
-                <div className="flex-1">
-                  <p className="font-bold text-[#3c3c3c]">{ins.courseName}</p>
-                  <p className="text-sm text-[#777] font-semibold">강사: {ins.name}</p>
-                </div>
-                <code className="text-sm font-black text-[#1cb0f6] bg-blue-50 px-2.5 py-1 rounded-lg">
-                  {ins.authKey}
-                </code>
-              </label>
-            ))}
-          </div>
-        )}
-
-        <button
-          onClick={handleIssue}
-          disabled={issuing || selected.size === 0}
-          className="flex items-center gap-2 px-6 py-3 bg-[#ff9600] text-white font-bold rounded-2xl border-b-4 border-[#cc7000] hover:bg-[#ff9600]/90 active:border-b-0 transition-all disabled:opacity-50"
-        >
-          {issuing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
-          {selected.size > 0 ? `${selected.size}개 과정 코드 발급` : "코드 발급"}
-        </button>
-      </div>
-
-      {/* 발급된 학생 코드 내역 */}
-      <div className="bg-white rounded-3xl border-2 border-[#e5e5e5] overflow-hidden">
-        <div className="px-5 py-4 border-b-2 border-[#e5e5e5] flex items-center justify-between">
-          <h2 className="font-black text-[#3c3c3c]">발급된 학생 코드 내역</h2>
-          <button onClick={onRefresh} disabled={loading} className="text-[#afafaf] hover:text-[#3c3c3c]">
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-        </div>
-
-        {studentCodes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-[#afafaf] gap-2">
-            <Key className="w-8 h-8" />
-            <p className="font-semibold">발급된 학생 코드가 없어요</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[#f7f7f7] border-b-2 border-[#e5e5e5]">
-                <tr>
-                  {["학생 코드 (8자리)", "과정명", "강사", "상태", "발급일", ""].map(h => (
-                    <th key={h} className="px-4 py-3 text-left font-bold text-[#777] whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y-2 divide-[#f7f7f7]">
-                {studentCodes.slice().reverse().map((c) => (
-                  <tr key={c.code} className="hover:bg-[#f7f7f7]">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <code className="font-black text-[#ff9600] tracking-widest">{c.code}</code>
-                        <CopyButton text={c.code} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-[#777]">{c.courseName}</td>
-                    <td className="px-4 py-3 font-semibold text-[#777]">{c.instructorName || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${c.used ? "bg-gray-100 text-gray-500" : "bg-green-100 text-green-700"}`}>
-                        {c.used ? `사용됨 (${c.usedBy})` : "미사용"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-[#afafaf] whitespace-nowrap">
-                      {new Date(c.createdAt).toLocaleDateString("ko-KR")}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleDeleteCode(c.code)}
-                        disabled={deletingCode === c.code}
-                        className="flex items-center gap-1 text-xs font-bold text-[#ff4b4b] hover:bg-red-50 px-2 py-1.5 rounded-lg transition-all disabled:opacity-50"
-                      >
-                        {deletingCode === c.code
-                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          : <Trash2 className="w-3.5 h-3.5" />}
-                        삭제
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════
 // 탭 4: 사용자 추가 (Supabase Admin API)
 // ═══════════════════════════════════════════════════════════════
 function AddUserTab({ token, onSuccess }: { token: string; onSuccess?: () => void }) {
   const [form, setForm] = useState({
-    email: "", password: "", full_name: "", role: "admin", phone: "",
+    email: "", password: "", full_name: "", role: "student", phone: "",
   })
   const [showPw, setShowPw] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -995,7 +753,7 @@ function AddUserTab({ token, onSuccess }: { token: string; onSuccess?: () => voi
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setResult({ email: form.email, role: form.role })
-      setForm({ email: "", password: "", full_name: "", role: "admin", phone: "" })
+      setForm({ email: "", password: "", full_name: "", role: "student", phone: "" })
       onSuccess?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : "오류가 발생했어요.")

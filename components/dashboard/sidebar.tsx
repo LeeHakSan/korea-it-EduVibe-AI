@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { Home, BookOpen, Trophy, User, PenLine, Bell, X, LogOut, CalendarDays, Briefcase, ShieldCheck } from "lucide-react"
+import { Home, BookOpen, Trophy, User, PenLine, Bell, X, LogOut, CalendarDays, Briefcase, ShieldCheck, GraduationCap } from "lucide-react"
 import { getSupabaseBrowser } from "@/lib/supabase-browser"
 import { useRouter } from "next/navigation"
 
@@ -18,10 +18,18 @@ const NAV_ITEMS = [
 ]
 
 const ADMIN_NAV_ITEMS = [
-  { href: "/dashboard/admin",   icon: ShieldCheck, label: "관리자 홈" },
-  { href: "/dashboard/notices", icon: Bell,        label: "공지사항" },
-  { href: "/dashboard/career",  icon: Briefcase,   label: "취업정보" },
-  { href: "/dashboard/profile", icon: User,        label: "프로필" },
+  { href: "/dashboard/admin",   icon: ShieldCheck,    label: "관리자 홈" },
+  { href: "/dashboard/notices", icon: Bell,           label: "공지사항" },
+  { href: "/dashboard/career",  icon: Briefcase,      label: "취업정보" },
+  { href: "/dashboard/profile", icon: User,           label: "프로필" },
+]
+
+const TEACHER_NAV_ITEMS = [
+  { href: "/dashboard/teacher", icon: GraduationCap,  label: "강사 홈" },
+  { href: "/dashboard/quest",   icon: Trophy,         label: "문제 출제" },
+  { href: "/dashboard/notices", icon: Bell,           label: "공지사항" },
+  { href: "/dashboard/career",  icon: Briefcase,      label: "취업정보" },
+  { href: "/dashboard/profile", icon: User,           label: "프로필" },
 ]
 
 interface SidebarProps {
@@ -54,7 +62,7 @@ export default function Sidebar({ isOpen, onClose, userName, role }: SidebarProp
       >
         {/* 로고 — 역할별 홈으로 이동 */}
         <div className="p-6 border-b-2 border-[#e5e5e5] flex items-center justify-between">
-          <Link href={role === "admin" ? "/dashboard/admin" : "/dashboard/home"}>
+          <Link href={role === "admin" ? "/dashboard/admin" : role === "teacher" ? "/dashboard/teacher" : "/dashboard/home"}>
             <h1 className="text-2xl font-black text-[#58cc02]">
               EduVibe<span className="text-[#1cb0f6]">-AI</span>
             </h1>
@@ -89,7 +97,7 @@ export default function Sidebar({ isOpen, onClose, userName, role }: SidebarProp
 
         {/* 네비게이션 */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {(role === "admin" ? ADMIN_NAV_ITEMS : NAV_ITEMS).map(({ href, icon: Icon, label }) => {
+          {(role === "admin" ? ADMIN_NAV_ITEMS : role === "teacher" ? TEACHER_NAV_ITEMS : NAV_ITEMS).map(({ href, icon: Icon, label }) => {
             // ?tab= 파라미터 분리
             const [hrefPath, hrefQuery] = href.split("?")
             const hrefTab = hrefQuery ? new URLSearchParams(hrefQuery).get("tab") ?? "" : ""
@@ -109,7 +117,9 @@ export default function Sidebar({ isOpen, onClose, userName, role }: SidebarProp
                   isActive
                     ? role === "admin"
                       ? "bg-[#ff9600] text-white shadow-sm"
-                      : "bg-[#58cc02] text-white shadow-sm"
+                      : role === "teacher"
+                      ? "bg-[#58cc02] text-white shadow-sm"
+                      : "bg-[#1cb0f6] text-white shadow-sm"
                     : "text-[#777] hover:bg-[#f7f7f7] hover:text-[#3c3c3c]"
                 }`}
               >
