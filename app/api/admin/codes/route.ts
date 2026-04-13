@@ -162,3 +162,53 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ error: "알 수 없는 액션이에요." }, { status: 400 })
 }
+
+// ── DELETE ────────────────────────────────────────────────────
+export async function DELETE(req: NextRequest) {
+  const token = req.headers.get("authorization")?.replace("Bearer ", "") ?? ""
+  const requester = await verifyAdmin(token)
+  if (!requester) return NextResponse.json({ error: "관리자 권한이 필요해요." }, { status: 403 })
+
+  const body = await req.json() as { action: "delete_instructor" | "delete_code"; signupCode?: string; code?: string }
+
+  const adminClient = getSupabaseAdmin()
+  const { data: { user: adminUser } } = await adminClient.auth.admin.getUserById(requester.id)
+  if (!adminUser) return NextResponse.json({ error: "관리자 계정을 찾을 수 없어요." }, { status: 404 })
+
+  const existingCodes: InviteCode[] = (adminUser.user_metadata?.invite_codes as InviteCode[]) ?? []
+  const existingInstructors: RegisteredInstructor[] = (adminUser.user_metadata?.registered_instructors as RegisteredInstructor[]) ?? []
+
+  // ── 강사 삭제 (관련 코드 전체 삭제) ──────────────────────────
+  if (body.action === "delete_instructor") {
+    if (!body.signupCode) return NextResponse.json({ error: "signupCode가 필요해요." }, { status: 400 })
+
+    const instructor = existingInstructors.find(i => i.signupCode === body.signupCode)
+    if (!instructor) return NextResponse.json({ error: "강사를 찾을 수 없어요." }, { status: 404 })
+
+    // 강사 목록에서 제거 + 해당 강사의 회원가입 코드 및 과정 학생 코드 전체 제거
+    const newInstructors = existingInstructors.filter(i => i.signupCode !== body.signupCode)
+    const newCodes = existingCodes.filter(c =>
+      c.code !== instructor.signupCode && c.courseCode !== instructor.authKey
+    )
+
+    const { error } = await adminClient.auth.admin.updateUserById(adminUser.id, {
+      user_metadata: { ...adminUser.user_metadata, invite_codes: newCodes, registered_instructors: newInstructors },
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
+
+  // ── 학생 코드 단건 삭제 ───────────────────────────────────────
+  if (body.action === "delete_code") {
+    if (!body.code) return NextResponse.json({ error: "code가 필요해요." }, { status: 400 })
+
+    const newCodes = existingCodes.filter(c => c.code !== body.code)
+    const { error } = await adminClient.auth.admin.updateUserById(adminUser.id, {
+      user_metadata: { ...adminUser.user_metadata, invite_codes: newCodes },
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
+
+  return NextResponse.json({ error: "알 수 없는 액션이에요." }, { status: 400 })
+}

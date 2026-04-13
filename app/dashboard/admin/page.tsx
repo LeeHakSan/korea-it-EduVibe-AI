@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   Users, BookOpen, ShieldCheck, BarChart3, RefreshCw,
   AlertCircle, Copy, Check, Plus, UserPlus, Key,
@@ -52,7 +52,9 @@ function CopyButton({ text }: { text: string }) {
 // ── 메인 ─────────────────────────────────────────────────────
 export default function AdminPage() {
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>("overview")
+  const searchParams = useSearchParams()
+  const initialTab = (searchParams.get("tab") as Tab | null) ?? "overview"
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [token, setToken] = useState("")
 
   // 개요 데이터
@@ -517,6 +519,27 @@ function InstructorTab({
   const [error, setError] = useState<string | null>(null)
   const { copied, copy } = useCopy()
 
+  // 강사 삭제
+  const [deleteTarget, setDeleteTarget] = useState<RegisteredInstructor | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDeleteInstructor = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch("/api/admin/codes", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "delete_instructor", signupCode: deleteTarget.signupCode }),
+      })
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error) }
+      setDeleteTarget(null)
+      onRefresh()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "삭제 중 오류가 발생했어요.")
+    } finally { setDeleting(false) }
+  }
+
   const handleRegister = async () => {
     if (!form.instructorName.trim() || !form.courseName.trim()) {
       setError("강사명과 과정명을 모두 입력해주세요.")
@@ -614,6 +637,34 @@ function InstructorTab({
         </button>
       </div>
 
+      {/* 강사 삭제 확인 다이얼로그 */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => !deleting && setDeleteTarget(null)} />
+          <div className="relative bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+            <h3 className="font-black text-[#3c3c3c] text-lg">강사 삭제</h3>
+            <div className="p-4 bg-red-50 rounded-2xl space-y-1">
+              <p className="font-bold text-[#3c3c3c]">{deleteTarget.name}</p>
+              <p className="text-sm text-[#777] font-semibold">{deleteTarget.courseName}</p>
+              <p className="text-xs text-[#ff4b4b] font-semibold mt-2">
+                ⚠ 해당 강사의 회원가입 코드 및 연결된 학생 코드가 모두 삭제됩니다.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting}
+                className="flex-1 py-2.5 rounded-2xl border-2 border-[#e5e5e5] font-bold text-[#777] hover:bg-[#f7f7f7] transition-all disabled:opacity-50">
+                취소
+              </button>
+              <button onClick={handleDeleteInstructor} disabled={deleting}
+                className="flex-1 py-2.5 rounded-2xl bg-[#ff4b4b] text-white font-bold border-b-4 border-[#cc2222] hover:bg-[#ff4b4b]/90 active:border-b-0 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 등록된 강사 목록 */}
       <div className="bg-white rounded-3xl border-2 border-[#e5e5e5] overflow-hidden">
         <div className="px-5 py-4 border-b-2 border-[#e5e5e5] flex items-center justify-between">
@@ -639,7 +690,7 @@ function InstructorTab({
             <table className="w-full text-sm">
               <thead className="bg-[#f7f7f7] border-b-2 border-[#e5e5e5]">
                 <tr>
-                  {["강사명", "과정명", "회원가입 코드 (8자리)", "학생 과정코드 (6자리)", "등록일"].map(h => (
+                  {["강사명", "과정명", "회원가입 코드 (8자리)", "학생 과정코드 (6자리)", "등록일", ""].map(h => (
                     <th key={h} className="px-4 py-3 text-left font-bold text-[#777] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -668,6 +719,14 @@ function InstructorTab({
                       </td>
                       <td className="px-4 py-3 text-[#afafaf] whitespace-nowrap">
                         {new Date(ins.registeredAt).toLocaleDateString("ko-KR")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => setDeleteTarget(ins)}
+                          className="flex items-center gap-1 text-xs font-bold text-[#ff4b4b] hover:bg-red-50 px-2 py-1.5 rounded-lg transition-all"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />삭제
+                        </button>
                       </td>
                     </tr>
                   )
@@ -698,6 +757,24 @@ function CodeIssueTab({
   const [newCodes, setNewCodes] = useState<{ courseName: string; code: string }[]>([])
   const [error, setError] = useState<string | null>(null)
   const { copied, copy } = useCopy()
+
+  // 코드 삭제
+  const [deletingCode, setDeletingCode] = useState<string | null>(null)
+
+  const handleDeleteCode = async (code: string) => {
+    setDeletingCode(code)
+    try {
+      const res = await fetch("/api/admin/codes", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "delete_code", code }),
+      })
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error) }
+      onRefresh()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "삭제 중 오류가 발생했어요.")
+    } finally { setDeletingCode(null) }
+  }
 
   const toggleSelect = (authKey: string) => {
     setSelected(prev => {
@@ -846,7 +923,7 @@ function CodeIssueTab({
             <table className="w-full text-sm">
               <thead className="bg-[#f7f7f7] border-b-2 border-[#e5e5e5]">
                 <tr>
-                  {["학생 코드 (8자리)", "과정명", "강사", "상태", "발급일"].map(h => (
+                  {["학생 코드 (8자리)", "과정명", "강사", "상태", "발급일", ""].map(h => (
                     <th key={h} className="px-4 py-3 text-left font-bold text-[#777] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -869,6 +946,18 @@ function CodeIssueTab({
                     </td>
                     <td className="px-4 py-3 text-[#afafaf] whitespace-nowrap">
                       {new Date(c.createdAt).toLocaleDateString("ko-KR")}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleDeleteCode(c.code)}
+                        disabled={deletingCode === c.code}
+                        className="flex items-center gap-1 text-xs font-bold text-[#ff4b4b] hover:bg-red-50 px-2 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                      >
+                        {deletingCode === c.code
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Trash2 className="w-3.5 h-3.5" />}
+                        삭제
+                      </button>
                     </td>
                   </tr>
                 ))}

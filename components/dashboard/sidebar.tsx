@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Home, BookOpen, Trophy, User, PenLine, Bell, X, LogOut, CalendarDays, Briefcase, ShieldCheck, Users, BarChart3 } from "lucide-react"
+import { usePathname, useSearchParams } from "next/navigation"
+import { Home, BookOpen, Trophy, User, PenLine, Bell, X, LogOut, CalendarDays, Briefcase, ShieldCheck } from "lucide-react"
 import { getSupabaseBrowser } from "@/lib/supabase-browser"
 import { useRouter } from "next/navigation"
 
@@ -18,12 +18,10 @@ const NAV_ITEMS = [
 ]
 
 const ADMIN_NAV_ITEMS = [
-  { href: "/dashboard/admin",      icon: ShieldCheck,  label: "관리자 홈" },
-  { href: "/dashboard/admin/users",icon: Users,        label: "사용자 관리" },
-  { href: "/dashboard/admin/stats",icon: BarChart3,    label: "통계" },
-  { href: "/dashboard/notices",    icon: Bell,         label: "공지사항" },
-  { href: "/dashboard/career",     icon: Briefcase,    label: "취업정보" },
-  { href: "/dashboard/profile",    icon: User,         label: "프로필" },
+  { href: "/dashboard/admin",   icon: ShieldCheck, label: "관리자 홈" },
+  { href: "/dashboard/notices", icon: Bell,        label: "공지사항" },
+  { href: "/dashboard/career",  icon: Briefcase,   label: "취업정보" },
+  { href: "/dashboard/profile", icon: User,        label: "프로필" },
 ]
 
 interface SidebarProps {
@@ -35,6 +33,8 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose, userName, role }: SidebarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const currentTab = searchParams.get("tab") ?? ""
   const router = useRouter()
 
   const handleLogout = async () => {
@@ -90,9 +90,16 @@ export default function Sidebar({ isOpen, onClose, userName, role }: SidebarProp
         {/* 네비게이션 */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {(role === "admin" ? ADMIN_NAV_ITEMS : NAV_ITEMS).map(({ href, icon: Icon, label }) => {
-            const active = pathname === href || (href !== "/dashboard/admin" && pathname.startsWith(href) && href !== "/dashboard")
-            const adminActive = role === "admin" && pathname.startsWith("/dashboard/admin") && href === "/dashboard/admin" && pathname === "/dashboard/admin"
-            const isActive = adminActive || (href !== "/dashboard/admin" && active)
+            // ?tab= 파라미터 분리
+            const [hrefPath, hrefQuery] = href.split("?")
+            const hrefTab = hrefQuery ? new URLSearchParams(hrefQuery).get("tab") ?? "" : ""
+            // 어드민 탭 링크: 경로가 같고 tab 파라미터가 일치할 때 active
+            const isTabLink = hrefPath === "/dashboard/admin" && hrefTab !== ""
+            const isActive = isTabLink
+              ? pathname === hrefPath && currentTab === hrefTab
+              : hrefPath === "/dashboard/admin"
+                ? pathname === "/dashboard/admin" && currentTab === ""
+                : pathname === hrefPath || (hrefPath !== "/dashboard" && pathname.startsWith(hrefPath))
             return (
               <Link
                 key={href}
