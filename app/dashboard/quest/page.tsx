@@ -492,7 +492,7 @@ export default function QuestPage() {
       </div>
 
       {/* 강사 전용: AI 미션 생성 */}
-      {role === "instructor" && (
+      {role === "teacher" && (
         <div className="bg-[#f0fff0] border-2 border-[#58cc02]/30 rounded-2xl p-5 mb-6">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">

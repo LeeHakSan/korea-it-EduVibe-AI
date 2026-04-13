@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   if (userErr || !user) {
     return NextResponse.json({ error: "인증에 실패했어요." }, { status: 401 })
   }
-  if (user.user_metadata?.role !== "instructor") {
+  if (user.user_metadata?.role !== "teacher") {
     return NextResponse.json({ error: "강사 권한이 필요해요." }, { status: 403 })
   }
 

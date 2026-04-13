@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     .eq("id", user.id)
     .single()
 
-  if (profile?.role !== "instructor") {
+  if (profile?.role !== "teacher") {
     return NextResponse.json(
       { error: "강사만 문제를 생성할 수 있습니다." },
       { status: 403 }

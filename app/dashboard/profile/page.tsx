@@ -66,7 +66,7 @@ export default function ProfilePage() {
         email:    user.email ?? "",
         phone:    (meta.phone as string) ?? "",
         authKey:  (meta.auth_key as string) ?? "••••••",
-        role:     (meta.role as string) === "instructor" ? "강사" : "학생",
+        role:     (meta.role as string) === "teacher" ? "강사" : "학생",
       })
       setLoading(false)
     })

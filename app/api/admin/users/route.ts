@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
           full_name: (meta.full_name as string) ?? "",
           course_name: (meta.course_name as string) ?? "",
           course_code:
-            role === "instructor"
+            role === "teacher"
               ? (meta.auth_key as string) ?? ""
               : (meta.course_code as string) ?? "",
           createdAt: u.created_at,
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 3. 과정별 통계 (강사 기준)
-    const instructors = allUsers.filter((u) => u.role === "instructor")
+    const instructors = allUsers.filter((u) => u.role === "teacher")
     const courses = instructors.map((inst) => ({
       courseName: inst.course_name || `${inst.full_name}의 과정`,
       instructorName: inst.full_name,
