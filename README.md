@@ -102,11 +102,11 @@ app/
 ```
 테스트용 가계정 ID, PWD
 
-관리자 id pw
+관리자
 id : admin@test.com
 pw : admin@test.com
 
-학생 id pw
+학생
 id : student@test.com
 pw : student@test.com
 
