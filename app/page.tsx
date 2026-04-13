@@ -34,7 +34,7 @@ export default function LandingPage() {
           <h2 className="text-4xl md:text-6xl font-black text-[#3c3c3c] mb-4 text-balance">
             AI와 함께하는
             <br />
-            <span className="text-[#58cc02]">즐거운</span> 파이썬 학습
+            <span className="text-[#58cc02]">즐거운</span> IT학습
           </h2>
 
           <p className="text-lg md:text-xl text-[#777] font-semibold max-w-2xl mx-auto mb-10 text-pretty">
@@ -118,7 +118,7 @@ export default function LandingPage() {
             지금 바로 시작하세요!
           </h3>
           <p className="text-lg text-[#777] font-semibold mb-8">
-            AI와 함께 파이썬 마스터가 되어보세요.
+            AI와 함께 코딩 마스터가 되어보세요.
           </p>
           <Link
             href="/login"
@@ -136,7 +136,7 @@ export default function LandingPage() {
             EduVibe<span className="text-[#1cb0f6]">-AI</span>
           </h1>
           <p className="text-[#afafaf] font-semibold">
-            AI 파워드 파이썬 학습 플랫폼
+            AI 코딩 학습 플랫폼
           </p>
           <div className="mt-6 flex items-center justify-center gap-6 text-sm text-[#afafaf]">
             <Link href="#" className="hover:text-white transition-colors">

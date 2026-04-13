@@ -1,12 +1,11 @@
 /**
  * /api/attendance
- * GET  : 본인 출석 데이터 / 관리자 → 전체
+ * GET  : 본인 출석 데이터 / 강사 → 담당 학생 전체
  * POST : 오늘 출석 체크 (중복 방지)
  */
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
-import { isAdminUser } from "@/lib/auth"
 
 export const runtime = "nodejs"
 
@@ -35,7 +34,9 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 })
   const admin = getSupabaseAdmin()
 
-  if (isAdminUser(user)) {
+  // 강사: 담당 과정의 학생 전체 출석 반환
+  if (user.user_metadata?.role === "teacher") {
+    const teacherAuthKey = (user.user_metadata?.auth_key as string) ?? ""
     let page = 1
     const all: { userId: string; name: string; email: string; courseCode: string; courseName: string; attendance: string[]; xp: number }[] = []
     while (true) {
@@ -45,6 +46,7 @@ export async function GET(req: NextRequest) {
         const meta = u.user_metadata ?? {}
         const role = (meta.role as string) ?? ""
         if (role !== "student") continue
+        if (teacherAuthKey && (meta.course_code as string) !== teacherAuthKey) continue
         all.push({
           userId: u.id,
           name: (meta.full_name as string) ?? u.email ?? "",

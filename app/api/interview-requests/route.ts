@@ -1,14 +1,13 @@
 /**
  * /api/interview-requests
- * 학생 → 면담 요청 제출 / 관리자 → 전체 요청 조회 및 상태 업데이트
- * GET  : 본인 요청 / 관리자 → 전체
+ * 학생 → 면담 요청 제출 / 강사 → 전체 요청 조회 및 상태 업데이트
+ * GET  : 본인 요청 / 강사 → 담당 학생 전체
  * POST : 요청 제출 { reason, preferredDate? }
- * PATCH: 관리자 상태 변경 { studentId, requestId, status, adminNote? }
+ * PATCH: 강사 상태 변경 { studentId, requestId, status, adminNote? }
  */
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
-import { isAdminUser } from "@/lib/auth"
 
 export const runtime = "nodejs"
 
@@ -41,14 +40,19 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 })
   const admin = getSupabaseAdmin()
 
-  if (isAdminUser(user)) {
+  // 강사: 담당 학생 전체 면담 요청 반환
+  if (user.user_metadata?.role === "teacher") {
+    const teacherAuthKey = (user.user_metadata?.auth_key as string) ?? ""
     let page = 1
     const all: InterviewRequest[] = []
     while (true) {
       const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
       if (error || !data.users.length) break
       for (const u of data.users) {
-        const reqs: InterviewRequest[] = (u.user_metadata?.interview_requests as InterviewRequest[]) ?? []
+        const meta = u.user_metadata ?? {}
+        if ((meta.role as string) !== "student") continue
+        if (teacherAuthKey && (meta.course_code as string) !== teacherAuthKey) continue
+        const reqs: InterviewRequest[] = (meta.interview_requests as InterviewRequest[]) ?? []
         all.push(...reqs)
       }
       if (data.users.length < 1000) break
@@ -93,7 +97,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const user = await verifyUser(req)
-  if (!user || !isAdminUser(user)) return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 })
+  if (!user || user.user_metadata?.role !== "teacher") return NextResponse.json({ error: "강사 권한이 필요합니다." }, { status: 403 })
   const body = await req.json() as { studentId: string; requestId: string; status: string; adminNote?: string }
   if (!body.studentId || !body.requestId || !body.status)
     return NextResponse.json({ error: "필수 항목 누락." }, { status: 400 })

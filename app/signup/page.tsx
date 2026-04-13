@@ -13,9 +13,7 @@ interface CodeInfo {
   type?: "teacher" | "student"
   courseName?: string
   instructorName?: string
-  preAuthKey?: string   // 강사용: 미리 생성된 auth_key
   courseCode?: string   // 학생용: 강사의 auth_key
-  adminId?: string
   error?: string
 }
 
@@ -80,7 +78,7 @@ export default function SignupPage() {
     const raw = formData.inviteCode.trim().toUpperCase()
     setFormData(p => ({ ...p, inviteCode: raw }))
 
-    if (raw.length !== 6 && raw.length !== 8) {
+    if (raw.length !== 6) {
       setCodeInfo(null)
       return
     }
@@ -93,9 +91,7 @@ export default function SignupPage() {
         const json: CodeInfo = await res.json()
         setCodeInfo(json)
         if (!json.valid) {
-          const defaultMsg = raw.length === 8
-            ? "유효하지 않은 8자리 초대코드예요."
-            : "유효하지 않은 6자리 과정코드예요."
+          const defaultMsg = "유효하지 않은 6자리 과정코드예요."
           setErrors(p => ({ ...p, inviteCode: json.error ?? defaultMsg }))
         } else {
           setErrors(p => ({ ...p, inviteCode: undefined }))
@@ -112,7 +108,7 @@ export default function SignupPage() {
   const validateForm = (): boolean => {
     const errs: FormErrors = {}
 
-    if (!codeInfo?.valid) errs.inviteCode = "유효한 코드(강사 8자리 / 학생 6자리)를 입력해주세요."
+    if (!codeInfo?.valid) errs.inviteCode = "유효한 6자리 과정코드를 입력해주세요."
 
     if (!formData.fullName.trim()) errs.fullName = "이름을 입력해주세요."
 
@@ -166,9 +162,7 @@ export default function SignupPage() {
         inviteCode: formData.inviteCode,
         role,
         courseName: codeInfo.courseName ?? "",
-        authKey: codeInfo.preAuthKey,    // 강사용
         courseCode: codeInfo.courseCode,  // 학생용
-        adminId: codeInfo.adminId,
       }),
     })
 
@@ -230,7 +224,7 @@ export default function SignupPage() {
               EduVibe<span className="text-[#1cb0f6]">-AI</span>
             </h1>
           </Link>
-          <p className="text-[#777] mt-2 font-semibold">초대코드로 계정을 만들어요</p>
+          <p className="text-[#777] mt-2 font-semibold">과정코드로 계정을 만들어요</p>
         </div>
 
         <div className="bg-white rounded-3xl p-8 border-2 border-[#e5e5e5] space-y-5">
@@ -238,18 +232,18 @@ export default function SignupPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
 
-            {/* ── 초대코드 입력 ── */}
-            <Field label="코드 (강사 8자리 / 학생 6자리)" error={errors.inviteCode}>
+            {/* ── 과정코드 입력 ── */}
+            <Field label="과정코드 (6자리)" error={errors.inviteCode}>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="강사 8자리 초대코드 또는 학생 6자리 과정코드"
+                  placeholder="강사에게 받은 6자리 과정코드"
                   value={formData.inviteCode}
                   onChange={(e) => {
-                    const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8)
+                    const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6)
                     setFormData(p => ({ ...p, inviteCode: v }))
                   }}
-                  maxLength={8}
+                  maxLength={6}
                   className={`w-full px-4 py-3.5 rounded-2xl border-2 bg-[#f7f7f7] font-black tracking-widest text-center text-lg placeholder:text-[#afafaf] placeholder:font-normal placeholder:tracking-normal focus:outline-none focus:bg-white transition-all ${
                     errors.inviteCode ? "border-[#ff4b4b] focus:border-[#ff4b4b]"
                     : codeInfo?.valid ? "border-[#58cc02] focus:border-[#58cc02]"
@@ -398,7 +392,7 @@ export default function SignupPage() {
             {/* 코드 미입력 안내 */}
             {!codeInfo?.valid && (
               <div className="text-center py-6 text-[#afafaf]">
-                <p className="font-semibold text-sm">강사 8자리 초대코드 또는 학생 6자리 과정코드를 입력하면</p>
+                <p className="font-semibold text-sm">강사에게 받은 6자리 과정코드를 입력하면</p>
                 <p className="font-semibold text-sm">가입 양식이 나타납니다</p>
               </div>
             )}

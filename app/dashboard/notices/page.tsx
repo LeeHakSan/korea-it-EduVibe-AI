@@ -420,7 +420,7 @@ export default function NoticesPage() {
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-black text-[#3c3c3c]">공지사항</h1>
-        {role === "admin" && (
+        {role === "teacher" && (
           <button type="button" onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 px-4 py-2 bg-[#ff9600] text-white font-bold rounded-2xl border-b-4 border-[#cc7000] hover:bg-[#ff9600]/90 active:border-b-0 transition-all text-sm">
             <Plus className="w-4 h-4" />공지 작성
@@ -434,7 +434,7 @@ export default function NoticesPage() {
       </p>
 
       {/* 읽음 요약 (강사·학생) */}
-      {role !== "admin" && (
+      {role !== "teacher" && (
         <div className={`rounded-2xl p-4 mb-6 flex items-center gap-3 ${
           unreadCount === 0 ? "bg-[#f0fff0] border-2 border-[#58cc02]/30" : "bg-[#eaf7ff] border-2 border-[#1cb0f6]/30"
         }`}>
@@ -457,7 +457,7 @@ export default function NoticesPage() {
       ) : (
         <div className="space-y-3">
           {sorted.map((notice) => (
-            <NoticeItem key={notice.id} notice={notice} userId={userId} isInstructor={role === "admin"}
+            <NoticeItem key={notice.id} notice={notice} userId={userId} isInstructor={role === "teacher"}
               onRead={handleRead} onDelete={handleDelete} />
           ))}
         </div>
@@ -521,7 +521,7 @@ export default function NoticesPage() {
       )}
 
       {/* ── 관리자: Q&A 관리 섹션 ── */}
-      {role === "admin" && (
+      {role === "teacher" && (
         <div className="mt-10">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">

@@ -383,7 +383,7 @@ function AdminInterviewCard({ request: r, onUpdate }: {
 
           {editing && (
             <div className="mt-2">
-              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="관리자 메모 (선택)"
+              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="강사 메모 (선택)"
                 className="w-full px-3 py-2 rounded-xl border-2 border-[#e5e5e5] bg-white text-sm font-semibold focus:outline-none focus:border-[#ff9600] text-[#3c3c3c]" />
             </div>
           )}
@@ -586,7 +586,7 @@ export default function CareerPage() {
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-black text-[#3c3c3c]">취업정보</h1>
-        {role === "admin" && (
+        {role === "teacher" && (
           <button
             type="button"
             onClick={() => setShowForm(true)}
@@ -650,19 +650,19 @@ export default function CareerPage() {
             <JobCard
               key={job.id}
               job={job}
-              isInstructor={role === "admin"}
+              isInstructor={role === "teacher"}
               onDelete={handleDelete}
             />
           ))}
         </div>
       )}
 
-      {/* 관리자 안내 */}
-      {role === "admin" && (
+      {/* 강사 안내 */}
+      {role === "teacher" && (
         <div className="mt-8 bg-[#fff8e8] border-2 border-[#ff9600]/30 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="w-4 h-4 text-[#ff9600]" />
-            <p className="text-sm font-bold text-[#ff9600]">관리자 안내</p>
+            <p className="text-sm font-bold text-[#ff9600]">강사 안내</p>
           </div>
           <p className="text-xs text-[#777] font-semibold">
             강사와 학생 모두 볼 수 있는 취업공고를 등록하세요. 등록된 공고는 모든 사용자의 취업정보 페이지에 표시됩니다.
@@ -724,7 +724,7 @@ export default function CareerPage() {
                       )}
                       {r.adminNote && (
                         <div className="mt-2 bg-white rounded-xl p-2 border border-[#e5e5e5]">
-                          <p className="text-xs font-bold text-[#ff9600] mb-0.5">관리자 메모</p>
+                          <p className="text-xs font-bold text-[#ff9600] mb-0.5">강사 메모</p>
                           <p className="text-xs text-[#3c3c3c] font-semibold">{r.adminNote}</p>
                         </div>
                       )}
@@ -740,7 +740,7 @@ export default function CareerPage() {
       )}
 
       {/* ── 관리자: 면담 요청 관리 섹션 ── */}
-      {role === "admin" && allInterviews.length > 0 && (
+      {role === "teacher" && allInterviews.length > 0 && (
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">

@@ -1,14 +1,13 @@
 /**
  * /api/student-qa
- * 학생·강사 → 관리자 질문 (Q&A)
- * GET  : 본인 질문 반환. 관리자 → 전체 질문
+ * 학생·강사 → Q&A
+ * GET  : 본인 질문 반환. 강사 → 담당 학생 전체 질문
  * POST : 질문 제출 { title, content }
- * PATCH: 관리자 답변 { authorId, questionId, answer }
+ * PATCH: 강사 답변 { authorId, questionId, answer }
  */
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
-import { isAdminUser } from "@/lib/auth"
 
 export const runtime = "nodejs"
 
@@ -43,18 +42,22 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 })
   const admin = getSupabaseAdmin()
 
-  if (isAdminUser(user)) {
+  // 강사: 담당 학생 전체 질문 반환
+  if (user.user_metadata?.role === "teacher") {
+    const teacherAuthKey = (user.user_metadata?.auth_key as string) ?? ""
     let page = 1
     const all: StudentQA[] = []
     while (true) {
       const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
       if (error || !data.users.length) break
       for (const u of data.users) {
-        const qs: StudentQA[] = (u.user_metadata?.student_qa as StudentQA[]) ?? []
         const meta = u.user_metadata ?? {}
+        if ((meta.role as string) !== "student") continue
+        if (teacherAuthKey && (meta.course_code as string) !== teacherAuthKey) continue
+        const qs: StudentQA[] = (meta.student_qa as StudentQA[]) ?? []
         for (const q of qs) all.push({
           ...q,
-          courseCode: q.courseCode ?? (meta.course_code as string) ?? (meta.auth_key as string) ?? "",
+          courseCode: q.courseCode ?? (meta.course_code as string) ?? "",
           courseName: q.courseName ?? (meta.course_name as string) ?? "",
         })
       }
@@ -102,7 +105,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const user = await verifyUser(req)
-  if (!user || !isAdminUser(user)) return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 })
+  if (!user || user.user_metadata?.role !== "teacher") return NextResponse.json({ error: "강사 권한이 필요합니다." }, { status: 403 })
   const body = await req.json() as { authorId: string; questionId: string; answer: string }
   if (!body.authorId || !body.questionId || !body.answer?.trim())
     return NextResponse.json({ error: "필수 항목 누락." }, { status: 400 })
