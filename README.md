@@ -100,6 +100,20 @@ app/
     ├── generate-missions/# 미션 생성
     └── interview-requests/ # 인터뷰 요청
 ```
+테스트용 가계정 ID, PWD
+
+관리자 id pw
+id : admin@test.com
+pw : admin@test.com
+
+학생 id pw
+id : student@test.com
+pw : student@test.com
+
+강사
+id : teacher@test.com
+pw : teacher@test.com
+
 
 ---
 
