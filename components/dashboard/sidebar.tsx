@@ -52,9 +52,9 @@ export default function Sidebar({ isOpen, onClose, userName, role }: SidebarProp
           isOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0 lg:static lg:z-auto`}
       >
-        {/* 로고 */}
+        {/* 로고 — 역할별 홈으로 이동 */}
         <div className="p-6 border-b-2 border-[#e5e5e5] flex items-center justify-between">
-          <Link href="/dashboard/home">
+          <Link href={role === "admin" ? "/dashboard/admin" : "/dashboard/home"}>
             <h1 className="text-2xl font-black text-[#58cc02]">
               EduVibe<span className="text-[#1cb0f6]">-AI</span>
             </h1>
@@ -70,7 +70,7 @@ export default function Sidebar({ isOpen, onClose, userName, role }: SidebarProp
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-sm ${
               role === "admin"
                 ? "bg-gradient-to-br from-[#ff9600] to-[#ff4b4b]"
-                : role === "instructor"
+                : role === "teacher"
                 ? "bg-gradient-to-br from-[#58cc02] to-[#1cb0f6]"
                 : "bg-gradient-to-br from-[#1cb0f6] to-[#9333ea]"
             }`}>
@@ -79,9 +79,9 @@ export default function Sidebar({ isOpen, onClose, userName, role }: SidebarProp
             <div>
               <p className="font-bold text-[#3c3c3c] text-sm">{userName}님</p>
               <p className="text-xs font-semibold" style={{
-                color: role === "admin" ? "#ff9600" : role === "instructor" ? "#58cc02" : "#1cb0f6"
+                color: role === "admin" ? "#ff9600" : role === "teacher" ? "#58cc02" : "#1cb0f6"
               }}>
-                {role === "admin" ? "관리자" : role === "instructor" ? "강사" : "수강생"}
+                {role === "admin" ? "관리자" : role === "teacher" ? "강사" : "수강생"}
               </p>
             </div>
           </div>

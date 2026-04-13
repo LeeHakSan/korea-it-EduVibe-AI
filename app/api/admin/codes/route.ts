@@ -12,7 +12,7 @@ export const runtime = "nodejs"
 // ── 타입 ──────────────────────────────────────────────────────
 export interface InviteCode {
   code: string              // 8자리 초대코드
-  type: "instructor" | "student"
+  type: "teacher" | "student"
   courseName: string
   instructorName: string
   preAuthKey: string        // 강사 코드: 미리 생성된 auth_key
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
 
     const newCode: InviteCode = {
       code: signupCode,
-      type: "instructor",
+      type: "teacher",
       courseName,
       instructorName,
       preAuthKey: authKey,

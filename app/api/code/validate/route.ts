@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       if (found) {
         return NextResponse.json({
           valid: true,
-          type: found.type,            // "instructor" | "student"
+          type: found.type,            // "teacher" | "student"
           courseName: found.courseName,
           instructorName: found.instructorName,
           preAuthKey: found.preAuthKey, // 강사용: 미리 생성된 auth_key

@@ -10,7 +10,7 @@ import { getRedirectPathForRole, type UserRole } from "@/lib/auth"
 // ── 타입 ──────────────────────────────────────────────────────
 interface CodeInfo {
   valid: boolean
-  type?: "instructor" | "student"
+  type?: "teacher" | "student"
   courseName?: string
   instructorName?: string
   preAuthKey?: string   // 강사용: 미리 생성된 auth_key
@@ -148,7 +148,7 @@ export default function SignupPage() {
     const supabase = getSupabaseBrowser()
 
     // 역할별 메타데이터 구성
-    const role: UserRole = codeInfo.type === "instructor" ? "instructor" : "student"
+    const role: UserRole = codeInfo.type === "teacher" ? "teacher" : "student"
     const metadata: Record<string, unknown> = {
       full_name: formData.fullName,
       username: formData.username,
@@ -157,7 +157,7 @@ export default function SignupPage() {
       course_name: codeInfo.courseName ?? "",
     }
 
-    if (role === "instructor") {
+    if (role === "teacher") {
       // 강사: 미리 생성된 auth_key 사용 (학생들이 과정코드로 입력)
       metadata.auth_key = codeInfo.preAuthKey ?? ""
     } else {
@@ -201,7 +201,7 @@ export default function SignupPage() {
   // ── 역할 배지 ─────────────────────────────────────────────────
   const RoleBadge = () => {
     if (!codeInfo?.valid || !codeInfo.type) return null
-    const isInstructor = codeInfo.type === "instructor"
+    const isInstructor = codeInfo.type === "teacher"
     return (
       <div className={`flex items-center gap-3 p-3 rounded-2xl border-2 ${
         isInstructor ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"
@@ -220,7 +220,7 @@ export default function SignupPage() {
     )
   }
 
-  const accentColor = codeInfo?.type === "instructor" ? "#58cc02"
+  const accentColor = codeInfo?.type === "teacher" ? "#58cc02"
     : codeInfo?.type === "student" ? "#1cb0f6"
     : "#58cc02"
 
@@ -379,7 +379,7 @@ export default function SignupPage() {
                   className="w-full py-4 rounded-2xl font-bold text-lg text-white border-b-4 hover:opacity-90 active:border-b-0 active:mt-1 transition-all duration-200 mt-2 disabled:opacity-70"
                   style={{
                     backgroundColor: accentColor,
-                    borderColor: codeInfo?.type === "instructor" ? "#46a302"
+                    borderColor: codeInfo?.type === "teacher" ? "#46a302"
                       : codeInfo?.type === "student" ? "#0e8ecf"
                       : "#46a302",
                   }}
@@ -393,7 +393,7 @@ export default function SignupPage() {
                       가입 중...
                     </span>
                   ) : (
-                    `${codeInfo?.type === "instructor" ? "강사" : "수강생"}으로 가입하기`
+                    `${codeInfo?.type === "teacher" ? "강사" : "수강생"}으로 가입하기`
                   )}
                 </button>
               </>

@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 
       for (const u of data.users) {
         if (
-          u.user_metadata?.role === "instructor" &&
+          u.user_metadata?.role === "teacher" &&
           u.user_metadata?.auth_key === code
         ) {
           instructor = u.user_metadata as Record<string, unknown>

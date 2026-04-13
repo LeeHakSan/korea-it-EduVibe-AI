@@ -3,7 +3,7 @@
  * 서버/클라이언트 양쪽에서 역할 정보를 꺼내는 헬퍼들
  */
 
-export type UserRole = "admin" | "instructor" | "student"
+export type UserRole = "admin" | "teacher" | "student"
 
 type UserLike = {
   user_metadata?: Record<string, unknown>
@@ -22,8 +22,8 @@ export function getRoleFromUser(user: UserLike): UserRole {
     (user.user_metadata?.role as string | undefined) ??
     (user.app_metadata?.role as string | undefined)
 
-  // role 이 명시적으로 "instructor" 또는 "student" 인 경우에만 해당 역할 반환
-  if (role === "instructor") return "instructor"
+  // role 이 명시적으로 "teacher" 또는 "student" 인 경우에만 해당 역할 반환
+  if (role === "teacher") return "teacher"
   if (role === "student") return "student"
 
   // role 이 "admin" 이거나 아예 미설정(Supabase 대시보드 직접 생성)이면 관리자
@@ -37,7 +37,7 @@ export function getRoleFromUser(user: UserLike): UserRole {
 export function getCourseCodeFromUser(user: UserLike): string {
   if (!user) return ""
   const role = (user.user_metadata?.role as string) ?? "student"
-  if (role === "instructor") return (user.user_metadata?.auth_key as string) ?? ""
+  if (role === "teacher") return (user.user_metadata?.auth_key as string) ?? ""
   return (user.user_metadata?.course_code as string) ?? ""
 }
 
@@ -61,7 +61,7 @@ export function getRedirectPathForRole(role: UserRole): string {
  * API 라우트에서 사용하는 관리자 여부 판단
  *
  * Supabase 대시보드에서 직접 생성한 계정은 role 메타데이터가 없으므로
- * role 이 "instructor" 또는 "student" 로 명시된 경우만 관리자가 아닌 것으로 처리.
+ * role 이 "teacher" 또는 "student" 로 명시된 경우만 관리자가 아닌 것으로 처리.
  */
 export function isAdminUser(user: UserLike): boolean {
   if (!user) return false
@@ -69,6 +69,6 @@ export function isAdminUser(user: UserLike): boolean {
     (user.user_metadata?.role as string | undefined) ??
     (user.app_metadata?.role as string | undefined)
   // 명시적으로 일반 역할인 경우만 제외
-  if (role === "instructor" || role === "student") return false
+  if (role === "teacher" || role === "student") return false
   return true // "admin" 이거나 미설정 모두 관리자
 }

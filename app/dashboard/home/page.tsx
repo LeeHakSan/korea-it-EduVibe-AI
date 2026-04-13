@@ -47,6 +47,10 @@ export default function HomePage() {
   const [role, setRole] = useState<UserRole>("student")
   const [notices, setNotices] = useState<Notice[]>([])
   const [dayInfo, setDayInfo] = useState({ dayName: "월", motivation: MOTIVATIONS[1] })
+  const [token, setToken] = useState("")
+  const [attendanceTotal, setAttendanceTotal] = useState(0)
+  const [todayChecked, setTodayChecked] = useState(false)
+  const [attendChecking, setAttendChecking] = useState(false)
 
   useEffect(() => {
     // 요일 계산
@@ -66,17 +70,41 @@ export default function HomePage() {
 
   useEffect(() => {
     const supabase = getSupabaseBrowser()
-    supabase.auth.getUser().then(({ data }: { data: { user: import("@supabase/supabase-js").User | null } }) => {
-      const user = data.user
-      if (!user) return
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: import("@supabase/supabase-js").Session | null } }) => {
+      if (!session) return
+      const user = session.user
+      setToken(session.access_token)
       setRole(getRoleFromUser(user))
       const name =
         (user.user_metadata?.full_name as string) ??
         (user.user_metadata?.name as string) ??
         user.email?.split("@")[0] ?? "학습자"
       setUserName(name)
+      // 출석 데이터 로드
+      const att: string[] = (user.user_metadata?.attendance as string[]) ?? []
+      setAttendanceTotal(att.length)
+      // Use ISO format YYYY-MM-DD to match API storage
+      const now = new Date()
+      const isoToday = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`
+      setTodayChecked(att.includes(isoToday))
     })
   }, [])
+
+  const handleAttendanceCheck = async () => {
+    if (!token || todayChecked || attendChecking) return
+    setAttendChecking(true)
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const json = await res.json()
+        setTodayChecked(true)
+        setAttendanceTotal(prev => json.alreadyChecked ? prev : prev + 1)
+      }
+    } finally { setAttendChecking(false) }
+  }
 
   const currentUnit = learningPath.find((u) => u.status === "current") ?? learningPath[0]
   const completedCount = learningPath.filter((u) => u.status === "completed").length
@@ -86,7 +114,7 @@ export default function HomePage() {
 
       {/* 역할 배너 + 요일 인사 */}
       <div className={`rounded-2xl p-5 mb-8 ${
-        role === "instructor"
+        role === "teacher"
           ? "bg-gradient-to-r from-[#58cc02] to-[#46a302]"
           : "bg-gradient-to-r from-[#1cb0f6] to-[#1899d6]"
       }`}>
@@ -96,7 +124,7 @@ export default function HomePage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-white/80 text-sm font-semibold">
-              {role === "instructor" ? "강사 모드" : "학생 모드"} · {dayInfo.dayName}요일
+              {role === "teacher" ? "강사 모드" : "학생 모드"} · {dayInfo.dayName}요일
             </p>
             <p className="text-white font-black text-lg leading-snug">
               {userName}님, {dayInfo.motivation.message}
@@ -106,7 +134,7 @@ export default function HomePage() {
             </p>
           </div>
           <div className="shrink-0">
-            {role === "instructor"
+            {role === "teacher"
               ? <GraduationCap className="w-6 h-6 text-white/60" />
               : <Users className="w-6 h-6 text-white/60" />
             }
@@ -129,14 +157,21 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* 스트릭 */}
-            <div className="bg-[#fff9e6] rounded-2xl p-5 border-2 border-[#ffc800]/30">
-              <p className="text-xs font-bold text-[#ffc800] uppercase tracking-wide mb-1">스트릭</p>
+            {/* 출석 체크 */}
+            <div className={`rounded-2xl p-5 border-2 ${todayChecked ? "bg-[#f0fff0] border-[#58cc02]/30" : "bg-[#fff9e6] border-[#ffc800]/30"}`}>
+              <p className="text-xs font-bold text-[#afafaf] uppercase tracking-wide mb-1">출석</p>
               <div className="flex items-end gap-1">
-                <p className="text-3xl font-black text-[#ff9600]">7</p>
-                <p className="text-lg font-bold text-[#ff9600] mb-0.5">일</p>
+                <p className={`text-3xl font-black ${todayChecked ? "text-[#58cc02]" : "text-[#ff9600]"}`}>{attendanceTotal}</p>
+                <p className={`text-lg font-bold mb-0.5 ${todayChecked ? "text-[#58cc02]" : "text-[#ff9600]"}`}>일</p>
               </div>
-              <Flame className="w-6 h-6 text-[#ffc800] mt-1" />
+              {todayChecked ? (
+                <p className="text-xs font-bold text-[#58cc02] mt-2">✅ 오늘 출석 완료!</p>
+              ) : (
+                <button type="button" onClick={handleAttendanceCheck} disabled={attendChecking}
+                  className="mt-2 text-xs font-bold text-white bg-[#ffc800] px-3 py-1.5 rounded-xl hover:bg-[#ffb300] transition-all disabled:opacity-60 flex items-center gap-1">
+                  {attendChecking ? "처리 중..." : "📍 출석 체크"}
+                </button>
+              )}
             </div>
 
             {/* XP */}
@@ -181,7 +216,7 @@ export default function HomePage() {
       )}
 
       {/* 강사 전용: 요약 카드 */}
-      {role === "instructor" && (
+      {role === "teacher" && (
         <>
           <h2 className="text-lg font-black text-[#3c3c3c] mb-4">강사 메뉴</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">

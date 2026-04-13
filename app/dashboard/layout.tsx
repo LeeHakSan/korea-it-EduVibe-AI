@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Menu } from "lucide-react"
+import { useRouter, usePathname } from "next/navigation"
+import Link from "next/link"
+import { Menu, ArrowLeft } from "lucide-react"
 import Sidebar from "@/components/dashboard/sidebar"
 import { getSupabaseBrowser } from "@/lib/supabase-browser"
 import { getRoleFromUser, type UserRole } from "@/lib/auth"
@@ -10,6 +11,7 @@ import ChatbotWidget from "@/components/chatbot-widget"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [userName, setUserName] = useState("학습자")
   const [role, setRole] = useState<UserRole>("student")
@@ -59,10 +61,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <button onClick={() => setIsMenuOpen(true)} className="p-2 text-[#3c3c3c]">
             <Menu className="w-6 h-6" />
           </button>
-          <h1 className="text-xl font-black text-[#58cc02]">
-            EduVibe<span className="text-[#1cb0f6]">-AI</span>
-          </h1>
-          <div className="w-10" />
+          <Link href={role === "admin" ? "/dashboard/admin" : "/dashboard/home"}>
+            <h1 className="text-xl font-black text-[#58cc02]">
+              EduVibe<span className="text-[#1cb0f6]">-AI</span>
+            </h1>
+          </Link>
+          {/* 뒤로가기 버튼: 홈이 아닐 때 표시 */}
+          {pathname !== "/dashboard/admin" && pathname !== "/dashboard/home" ? (
+            <button
+              onClick={() => router.push(role === "admin" ? "/dashboard/admin" : "/dashboard/home")}
+              className="flex items-center gap-1 px-2 py-1.5 text-[#777] hover:text-[#3c3c3c] font-bold text-xs rounded-xl hover:bg-[#f7f7f7] transition-all"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              홈
+            </button>
+          ) : (
+            <div className="w-10" />
+          )}
         </header>
 
         <main className="flex-1 overflow-y-auto">

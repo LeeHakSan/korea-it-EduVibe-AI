@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   const { targetUserId, newRole } = (await req.json()) as {
     targetUserId: string
-    newRole: "admin" | "instructor" | "student"
+    newRole: "admin" | "teacher" | "student"
   }
 
   if (!targetUserId || !newRole) {
